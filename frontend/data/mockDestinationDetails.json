@@ -1,0 +1,93 @@
+{
+  "1": {
+    "id": 1,
+    "name": "杭州",
+    "summary": "适合预算800内、周末放松、不折腾",
+    "budget_range": "600-800",
+    "recommend_reasons": [
+      "交通简单（高铁直达，1.5h）",
+      "吃住便宜（青旅多，小吃丰富）",
+      "不踩雷（学生友好，安全可靠）"
+    ],
+    "itinerary": [
+      "Day1：上午高铁 → 下午西湖 → 晚上河坊街",
+      "Day2：灵隐寺 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 120,
+      "click_count_7d": 85,
+      "is_popular": true,
+      "is_student_favorite": true
+    },
+    "cta_links": {
+      "hotel": "https://hotels.ctrip.com/hotels/list?city=杭州&utm_source=travel_student",
+      "transport": "https://trains.ctrip.com/trainbooking/TrainList.aspx?from=上海&to=杭州&utm_source=travel_student",
+      "package": "https://vacations.ctrip.com/list?dest=杭州&utm_source=travel_student"
+    },
+    "weather": {
+      "current": "晴天，20°C",
+      "forecast": ["明天：晴，22°C", "后天：多云，21°C", "大后天：晴，23°C"]
+    }
+  },
+  "2": {
+    "id": 2,
+    "name": "苏州",
+    "summary": "适合预算700内、喜欢园林文化、周末游",
+    "budget_range": "500-700",
+    "recommend_reasons": [
+      "交通便利（高铁1小时直达）",
+      "门票便宜（学生票多）",
+      "文化底蕴深厚（园林、古镇）"
+    ],
+    "itinerary": [
+      "Day1：拙政园 → 平江路 → 观前街",
+      "Day2：虎丘 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 95,
+      "click_count_7d": 72,
+      "is_popular": true,
+      "is_student_favorite": true
+    },
+    "cta_links": {
+      "hotel": "https://hotels.ctrip.com/hotels/list?city=苏州&utm_source=travel_student",
+      "transport": "https://trains.ctrip.com/trainbooking/TrainList.aspx?from=上海&to=苏州&utm_source=travel_student",
+      "package": "https://vacations.ctrip.com/list?dest=苏州&utm_source=travel_student"
+    },
+    "weather": {
+      "current": "晴天，19°C",
+      "forecast": ["明天：晴，21°C", "后天：多云，20°C", "大后天：晴，22°C"]
+    }
+  },
+  "3": {
+    "id": 3,
+    "name": "南京",
+    "summary": "适合预算800内、喜欢历史文化、周末游",
+    "budget_range": "600-800",
+    "recommend_reasons": [
+      "交通便利（高铁直达，地铁发达）",
+      "景点免费多（中山陵、夫子庙）",
+      "美食丰富（鸭血粉丝、盐水鸭）"
+    ],
+    "itinerary": [
+      "Day1：中山陵 → 夫子庙 → 秦淮河",
+      "Day2：总统府 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 110,
+      "click_count_7d": 78,
+      "is_popular": true,
+      "is_student_favorite": true
+    },
+    "cta_links": {
+      "hotel": "https://hotels.ctrip.com/hotels/list?city=南京&utm_source=travel_student",
+      "transport": "https://trains.ctrip.com/trainbooking/TrainList.aspx?from=上海&to=南京&utm_source=travel_student",
+      "package": "https://vacations.ctrip.com/list?dest=南京&utm_source=travel_student"
+    },
+    "weather": {
+      "current": "晴天，18°C",
+      "forecast": ["明天：晴，20°C", "后天：多云，19°C", "大后天：晴，21°C"]
+    }
+  }
+}
+

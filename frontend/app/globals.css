@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* CTA按钮样式 - 醒目设计 */
+.cta-button {
+  @apply bg-gradient-to-r from-primary-600 to-primary-700 text-white font-bold 
+         py-3 px-6 rounded-lg 
+         hover:from-primary-700 hover:to-primary-800 
+         active:from-primary-800 active:to-primary-900
+         transition-all duration-200
+         shadow-lg hover:shadow-2xl hover:scale-[1.02]
+         text-center
+         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+}
+
+/* 推荐卡片样式 */
+.recommendation-card {
+  @apply bg-white rounded-xl shadow-md hover:shadow-xl 
+         transition-all duration-300
+         overflow-hidden
+         cursor-pointer
+         hover:scale-[1.02];
+}
+

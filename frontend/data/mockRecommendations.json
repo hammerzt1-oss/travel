@@ -1,0 +1,128 @@
+{
+  "week": [
+    {
+      "id": 1,
+      "name": "杭州",
+      "tag": "学生周末推荐",
+      "budget_range": "600-800",
+      "primary_reason": "预算600-800内可成行",
+      "transport": "高铁直达 · 1.5h",
+      "weather": "未来两天晴",
+      "suitable_days": "1-2天",
+      "trust_signals": {
+        "student_count": 120,
+        "click_count_7d": 85,
+        "is_popular": true
+      },
+      "cover_image": "/images/hangzhou.jpg",
+      "cta_text": "查看学生最低价"
+    },
+    {
+      "id": 2,
+      "name": "苏州",
+      "tag": "学生周末推荐",
+      "budget_range": "500-700",
+      "primary_reason": "预算500-700内可成行",
+      "transport": "高铁直达 · 1h",
+      "weather": "未来两天晴",
+      "suitable_days": "1-2天",
+      "trust_signals": {
+        "student_count": 95,
+        "click_count_7d": 72,
+        "is_popular": false
+      },
+      "cover_image": "/images/suzhou.jpg",
+      "cta_text": "查看学生最低价"
+    },
+    {
+      "id": 3,
+      "name": "南京",
+      "tag": "学生周末推荐",
+      "budget_range": "600-800",
+      "primary_reason": "预算600-800内可成行",
+      "transport": "高铁直达 · 1.5h",
+      "weather": "未来两天晴",
+      "suitable_days": "1-2天",
+      "trust_signals": {
+        "student_count": 110,
+        "click_count_7d": 78,
+        "is_popular": true
+      },
+      "cover_image": "/images/nanjing.jpg",
+      "cta_text": "查看学生最低价"
+    }
+  ],
+  "month": [
+    {
+      "id": 4,
+      "name": "成都",
+      "tag": "学生假期推荐",
+      "budget_range": "800-1000",
+      "primary_reason": "预算800-1000内可成行",
+      "transport": "飞机 · 2.5h",
+      "weather": "未来三天晴",
+      "suitable_days": "3-4天",
+      "trust_signals": {
+        "student_count": 150,
+        "click_count_7d": 95,
+        "is_popular": true
+      },
+      "cover_image": "/images/chengdu.jpg",
+      "cta_text": "查看学生最低价"
+    },
+    {
+      "id": 5,
+      "name": "厦门",
+      "tag": "学生假期推荐",
+      "budget_range": "700-900",
+      "primary_reason": "预算700-900内可成行",
+      "transport": "飞机 · 2h",
+      "weather": "未来三天晴",
+      "suitable_days": "3-4天",
+      "trust_signals": {
+        "student_count": 135,
+        "click_count_7d": 88,
+        "is_popular": false
+      },
+      "cover_image": "/images/xiamen.jpg",
+      "cta_text": "查看学生最低价"
+    }
+  ],
+  "popular": [
+    {
+      "id": 1,
+      "name": "杭州",
+      "tag": "学生常选",
+      "budget_range": "600-800",
+      "primary_reason": "预算600-800内可成行",
+      "transport": "高铁直达 · 1.5h",
+      "weather": "未来两天晴",
+      "suitable_days": "1-2天",
+      "trust_signals": {
+        "student_count": 120,
+        "click_count_7d": 85,
+        "is_popular": true
+      },
+      "cover_image": "/images/hangzhou.jpg",
+      "cta_text": "查看学生最低价"
+    },
+    {
+      "id": 3,
+      "name": "南京",
+      "tag": "学生常选",
+      "budget_range": "600-800",
+      "primary_reason": "预算600-800内可成行",
+      "transport": "高铁直达 · 1.5h",
+      "weather": "未来两天晴",
+      "suitable_days": "1-2天",
+      "trust_signals": {
+        "student_count": 110,
+        "click_count_7d": 78,
+        "is_popular": true
+      },
+      "cover_image": "/images/nanjing.jpg",
+      "cta_text": "查看学生最低价"
+    }
+  ]
+}
+

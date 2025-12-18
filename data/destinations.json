@@ -1,0 +1,773 @@
+[
+  {
+    "id": 1,
+    "name": "杭州",
+    "province": "浙江",
+    "city": "杭州",
+    "region": "华东地区",
+    "latitude": 30.2741,
+    "longitude": 120.1551,
+    "description": "江南水乡，西湖美景，适合周末放松",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/hangzhou.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "门票便宜"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "1.5h",
+      "airport": true
+    },
+    "summary": "适合预算800内、周末放松、不折腾",
+    "recommend_reasons": [
+      "交通简单（高铁直达，1.5h）",
+      "吃住便宜（青旅多，小吃丰富）",
+      "不踩雷（学生友好，安全可靠）"
+    ],
+    "itinerary": [
+      "Day1：上午高铁 → 下午西湖 → 晚上河坊街",
+      "Day2：灵隐寺 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 120,
+      "click_count_7d": 85,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 2,
+    "name": "苏州",
+    "province": "江苏",
+    "city": "苏州",
+    "region": "华东地区",
+    "latitude": 31.2989,
+    "longitude": 120.5853,
+    "description": "园林之城，小桥流水，适合文化游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/suzhou.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "文化古迹"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "1h",
+      "airport": false
+    },
+    "summary": "适合预算700内、喜欢园林文化、周末游",
+    "recommend_reasons": [
+      "交通便利（高铁1小时直达）",
+      "门票便宜（学生票多）",
+      "文化底蕴深厚（园林、古镇）"
+    ],
+    "itinerary": [
+      "Day1：拙政园 → 平江路 → 观前街",
+      "Day2：虎丘 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 95,
+      "click_count_7d": 72,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 3,
+    "name": "南京",
+    "province": "江苏",
+    "city": "南京",
+    "region": "华东地区",
+    "latitude": 32.0603,
+    "longitude": 118.7969,
+    "description": "六朝古都，历史名城，适合文化游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/nanjing.jpg",
+    "student_tags": ["住宿便宜", "地铁方便", "文化古迹"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "1.5h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢历史文化、周末游",
+    "recommend_reasons": [
+      "交通便利（高铁直达，地铁发达）",
+      "景点免费多（中山陵、夫子庙）",
+      "美食丰富（鸭血粉丝、盐水鸭）"
+    ],
+    "itinerary": [
+      "Day1：中山陵 → 夫子庙 → 秦淮河",
+      "Day2：总统府 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 110,
+      "click_count_7d": 78,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 4,
+    "name": "北京",
+    "province": "北京",
+    "city": "北京",
+    "region": "华北地区",
+    "latitude": 39.9042,
+    "longitude": 116.4074,
+    "description": "首都北京，历史文化名城，适合深度游",
+    "budget_range": "800-1000",
+    "avg_cost_level": 4,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/beijing.jpg",
+    "student_tags": ["地铁方便", "文化古迹", "门票便宜"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "4.5h",
+      "airport": true
+    },
+    "summary": "适合预算1000内、喜欢历史文化、周末游",
+    "recommend_reasons": [
+      "交通便利（高铁直达，地铁发达）",
+      "景点丰富（故宫、天坛、颐和园）",
+      "学生票优惠多（大部分景点有学生价）"
+    ],
+    "itinerary": [
+      "Day1：天安门 → 故宫 → 景山公园",
+      "Day2：天坛 → 前门大街 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 180,
+      "click_count_7d": 120,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 5,
+    "name": "上海",
+    "province": "上海",
+    "city": "上海",
+    "region": "华东地区",
+    "latitude": 31.2304,
+    "longitude": 121.4737,
+    "description": "魔都上海，现代都市，适合周末探索",
+    "budget_range": "700-900",
+    "avg_cost_level": 4,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/shanghai.jpg",
+    "student_tags": ["地铁方便", "购物便利", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "5h",
+      "airport": true
+    },
+    "summary": "适合预算900内、喜欢都市探索、周末游",
+    "recommend_reasons": [
+      "交通便利（高铁直达，地铁四通八达）",
+      "免费景点多（外滩、田子坊、新天地）",
+      "美食丰富（小笼包、生煎、本帮菜）"
+    ],
+    "itinerary": [
+      "Day1：外滩 → 南京路 → 豫园",
+      "Day2：田子坊 → 新天地 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 165,
+      "click_count_7d": 110,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 6,
+    "name": "成都",
+    "province": "四川",
+    "city": "成都",
+    "region": "西南地区",
+    "latitude": 30.6624,
+    "longitude": 104.0633,
+    "description": "天府之国，美食之都，适合吃货游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/chengdu.jpg",
+    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "8h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢美食、3-4天游",
+    "recommend_reasons": [
+      "美食天堂（火锅、串串、小吃便宜）",
+      "住宿便宜（青旅多，价格实惠）",
+      "景点免费多（宽窄巷子、锦里、春熙路）"
+    ],
+    "itinerary": [
+      "Day1：宽窄巷子 → 锦里 → 武侯祠",
+      "Day2：大熊猫基地 → 春熙路",
+      "Day3：都江堰 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 145,
+      "click_count_7d": 95,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 7,
+    "name": "重庆",
+    "province": "重庆",
+    "city": "重庆",
+    "region": "西南地区",
+    "latitude": 29.5630,
+    "longitude": 106.5516,
+    "description": "山城重庆，8D魔幻，适合探索游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/chongqing.jpg",
+    "student_tags": ["美食丰富", "住宿便宜", "交通便利"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "7h",
+      "airport": true
+    },
+    "summary": "适合预算700内、喜欢探索、3-4天游",
+    "recommend_reasons": [
+      "美食便宜（火锅、小面、串串）",
+      "住宿实惠（青旅多，价格低）",
+      "免费景点多（洪崖洞、解放碑、磁器口）"
+    ],
+    "itinerary": [
+      "Day1：解放碑 → 洪崖洞 → 千厮门大桥",
+      "Day2：磁器口 → 李子坝轻轨站",
+      "Day3：南山一棵树 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 130,
+      "click_count_7d": 88,
+      "is_popular": true,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 8,
+    "name": "西安",
+    "province": "陕西",
+    "city": "西安",
+    "region": "西北地区",
+    "latitude": 34.3416,
+    "longitude": 108.9398,
+    "description": "古都西安，历史厚重，适合文化游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/xian.jpg",
+    "student_tags": ["文化古迹", "美食丰富", "住宿便宜"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "5.5h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢历史文化、3-4天游",
+    "recommend_reasons": [
+      "历史底蕴深厚（兵马俑、大雁塔、古城墙）",
+      "美食便宜（肉夹馍、凉皮、羊肉泡馍）",
+      "学生票优惠多（大部分景点有学生价）"
+    ],
+    "itinerary": [
+      "Day1：兵马俑 → 华清宫",
+      "Day2：大雁塔 → 古城墙 → 回民街",
+      "Day3：陕西历史博物馆 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 125,
+      "click_count_7d": 82,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 9,
+    "name": "厦门",
+    "province": "福建",
+    "city": "厦门",
+    "region": "华南地区",
+    "latitude": 24.4798,
+    "longitude": 118.0819,
+    "description": "海上花园，文艺小岛，适合放松游",
+    "budget_range": "700-900",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/xiamen.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "6h",
+      "airport": true
+    },
+    "summary": "适合预算900内、喜欢文艺放松、3-4天游",
+    "recommend_reasons": [
+      "文艺氛围浓厚（鼓浪屿、曾厝垵）",
+      "住宿便宜（民宿多，价格实惠）",
+      "美食丰富（沙茶面、海蛎煎、土笋冻）"
+    ],
+    "itinerary": [
+      "Day1：鼓浪屿 → 日光岩",
+      "Day2：曾厝垵 → 环岛路 → 厦门大学",
+      "Day3：南普陀寺 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 140,
+      "click_count_7d": 92,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 10,
+    "name": "青岛",
+    "province": "山东",
+    "city": "青岛",
+    "region": "华东地区",
+    "latitude": 36.0671,
+    "longitude": 120.3826,
+    "description": "海滨城市，啤酒之都，适合休闲游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "夏季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "中",
+    "cover_image": "/images/qingdao.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "5h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢海滨风光、3-4天游",
+    "recommend_reasons": [
+      "海滨风光（栈桥、八大关、金沙滩）",
+      "住宿便宜（青旅多，价格实惠）",
+      "美食丰富（海鲜、啤酒、烧烤）"
+    ],
+    "itinerary": [
+      "Day1：栈桥 → 八大关 → 第二海水浴场",
+      "Day2：青岛啤酒博物馆 → 台东步行街",
+      "Day3：崂山 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 105,
+      "click_count_7d": 68,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 11,
+    "name": "武汉",
+    "province": "湖北",
+    "city": "武汉",
+    "region": "华中地区",
+    "latitude": 30.5928,
+    "longitude": 114.3055,
+    "description": "江城武汉，美食之都，适合周末游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "中",
+    "cover_image": "/images/wuhan.jpg",
+    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "4.5h",
+      "airport": true
+    },
+    "summary": "适合预算700内、喜欢美食、周末游",
+    "recommend_reasons": [
+      "美食便宜（热干面、豆皮、鸭脖）",
+      "住宿实惠（青旅多，价格低）",
+      "免费景点多（黄鹤楼、东湖、户部巷）"
+    ],
+    "itinerary": [
+      "Day1：黄鹤楼 → 户部巷 → 长江大桥",
+      "Day2：东湖 → 楚河汉街 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 88,
+      "click_count_7d": 58,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 12,
+    "name": "长沙",
+    "province": "湖南",
+    "city": "长沙",
+    "region": "华中地区",
+    "latitude": 28.2278,
+    "longitude": 112.9388,
+    "description": "星城长沙，娱乐之都，适合周末游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "中",
+    "cover_image": "/images/changsha.jpg",
+    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "5h",
+      "airport": true
+    },
+    "summary": "适合预算700内、喜欢美食娱乐、周末游",
+    "recommend_reasons": [
+      "美食便宜（臭豆腐、糖油粑粑、口味虾）",
+      "住宿实惠（青旅多，价格低）",
+      "免费景点多（橘子洲、岳麓山、太平街）"
+    ],
+    "itinerary": [
+      "Day1：橘子洲 → 岳麓山 → 爱晚亭",
+      "Day2：太平街 → 坡子街 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 92,
+      "click_count_7d": 62,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 13,
+    "name": "广州",
+    "province": "广东",
+    "city": "广州",
+    "region": "华南地区",
+    "latitude": 23.1291,
+    "longitude": 113.2644,
+    "description": "羊城广州，美食天堂，适合周末游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "秋季、冬季",
+    "weekend_suitable": true,
+    "popularity_level": "高",
+    "cover_image": "/images/guangzhou.jpg",
+    "student_tags": ["美食丰富", "地铁方便", "住宿便宜"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "8h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢美食、周末游",
+    "recommend_reasons": [
+      "美食天堂（早茶、烧腊、糖水）",
+      "交通便利（地铁发达，公交方便）",
+      "免费景点多（沙面、陈家祠、珠江夜游）"
+    ],
+    "itinerary": [
+      "Day1：沙面 → 陈家祠 → 上下九步行街",
+      "Day2：广州塔 → 珠江夜游 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 115,
+      "click_count_7d": 75,
+      "is_popular": true,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 14,
+    "name": "深圳",
+    "province": "广东",
+    "city": "深圳",
+    "region": "华南地区",
+    "latitude": 22.5431,
+    "longitude": 114.0579,
+    "description": "特区深圳，现代都市，适合探索游",
+    "budget_range": "700-900",
+    "avg_cost_level": 4,
+    "best_season": "秋季、冬季",
+    "weekend_suitable": true,
+    "popularity_level": "中",
+    "cover_image": "/images/shenzhen.jpg",
+    "student_tags": ["地铁方便", "购物便利", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "8.5h",
+      "airport": true
+    },
+    "summary": "适合预算900内、喜欢现代都市、周末游",
+    "recommend_reasons": [
+      "现代都市（科技感强，购物便利）",
+      "交通便利（地铁发达，公交方便）",
+      "免费景点多（大梅沙、世界之窗、华侨城）"
+    ],
+    "itinerary": [
+      "Day1：世界之窗 → 华侨城 → 大梅沙",
+      "Day2：深圳湾公园 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 98,
+      "click_count_7d": 65,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 15,
+    "name": "天津",
+    "province": "天津",
+    "city": "天津",
+    "region": "华北地区",
+    "latitude": 39.3434,
+    "longitude": 117.2008,
+    "description": "津门天津，历史文化名城，适合周末游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": true,
+    "popularity_level": "中",
+    "cover_image": "/images/tianjin.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "0.5h",
+      "airport": true
+    },
+    "summary": "适合预算700内、喜欢历史文化、周末游",
+    "recommend_reasons": [
+      "交通便利（高铁半小时直达）",
+      "住宿便宜（青旅多，价格实惠）",
+      "美食丰富（狗不理、煎饼果子、耳朵眼炸糕）"
+    ],
+    "itinerary": [
+      "Day1：古文化街 → 意大利风情区 → 海河",
+      "Day2：五大道 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 75,
+      "click_count_7d": 48,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 16,
+    "name": "大连",
+    "province": "辽宁",
+    "city": "大连",
+    "region": "东北地区",
+    "latitude": 38.9140,
+    "longitude": 121.6147,
+    "description": "浪漫之都，海滨城市，适合休闲游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "夏季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "中",
+    "cover_image": "/images/dalian.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "6h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢海滨风光、3-4天游",
+    "recommend_reasons": [
+      "海滨风光（星海广场、棒棰岛、金石滩）",
+      "住宿便宜（青旅多，价格实惠）",
+      "美食丰富（海鲜、烧烤、东北菜）"
+    ],
+    "itinerary": [
+      "Day1：星海广场 → 星海公园 → 圣亚海洋世界",
+      "Day2：棒棰岛 → 老虎滩",
+      "Day3：金石滩 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 82,
+      "click_count_7d": 55,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 17,
+    "name": "昆明",
+    "province": "云南",
+    "city": "昆明",
+    "region": "西南地区",
+    "latitude": 25.0389,
+    "longitude": 102.7183,
+    "description": "春城昆明，四季如春，适合放松游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "全年",
+    "weekend_suitable": false,
+    "popularity_level": "中",
+    "cover_image": "/images/kunming.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "10h",
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢自然风光、3-4天游",
+    "recommend_reasons": [
+      "气候宜人（四季如春，适合出游）",
+      "住宿便宜（青旅多，价格实惠）",
+      "美食丰富（过桥米线、汽锅鸡、鲜花饼）"
+    ],
+    "itinerary": [
+      "Day1：翠湖公园 → 云南大学 → 金马碧鸡坊",
+      "Day2：石林 → 九乡",
+      "Day3：滇池 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 95,
+      "click_count_7d": 63,
+      "is_popular": false,
+      "is_student_favorite": false
+    }
+  },
+  {
+    "id": 18,
+    "name": "桂林",
+    "province": "广西",
+    "city": "桂林",
+    "region": "华南地区",
+    "latitude": 25.2342,
+    "longitude": 110.1994,
+    "description": "山水甲天下，自然风光，适合放松游",
+    "budget_range": "500-700",
+    "avg_cost_level": 2,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/guilin.jpg",
+    "student_tags": ["住宿便宜", "公交方便", "自然风光"],
+    "transport": {
+      "high_speed_rail": true,
+      "rail_time": "9h",
+      "airport": true
+    },
+    "summary": "适合预算700内、喜欢自然风光、3-4天游",
+    "recommend_reasons": [
+      "自然风光（漓江、阳朔、象鼻山）",
+      "住宿便宜（青旅多，价格实惠）",
+      "美食丰富（桂林米粉、啤酒鱼、螺蛳粉）"
+    ],
+    "itinerary": [
+      "Day1：象鼻山 → 两江四湖 → 正阳步行街",
+      "Day2：漓江 → 阳朔",
+      "Day3：遇龙河 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 118,
+      "click_count_7d": 78,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 19,
+    "name": "丽江",
+    "province": "云南",
+    "city": "丽江",
+    "region": "西南地区",
+    "latitude": 26.8550,
+    "longitude": 100.2277,
+    "description": "古城丽江，文艺小城，适合放松游",
+    "budget_range": "600-800",
+    "avg_cost_level": 3,
+    "best_season": "春季、秋季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/lijiang.jpg",
+    "student_tags": ["住宿便宜", "美食丰富", "自然风光"],
+    "transport": {
+      "high_speed_rail": false,
+      "rail_time": null,
+      "airport": true
+    },
+    "summary": "适合预算800内、喜欢文艺放松、3-4天游",
+    "recommend_reasons": [
+      "文艺氛围（古城、酒吧、客栈）",
+      "住宿便宜（客栈多，价格实惠）",
+      "自然风光（玉龙雪山、拉市海、束河古镇）"
+    ],
+    "itinerary": [
+      "Day1：丽江古城 → 木府 → 四方街",
+      "Day2：玉龙雪山 → 蓝月谷",
+      "Day3：拉市海 → 束河古镇 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 135,
+      "click_count_7d": 88,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  },
+  {
+    "id": 20,
+    "name": "三亚",
+    "province": "海南",
+    "city": "三亚",
+    "region": "华南地区",
+    "latitude": 18.2528,
+    "longitude": 109.5119,
+    "description": "热带海滨，度假天堂，适合放松游",
+    "budget_range": "800-1000",
+    "avg_cost_level": 4,
+    "best_season": "冬季、春季",
+    "weekend_suitable": false,
+    "popularity_level": "高",
+    "cover_image": "/images/sanya.jpg",
+    "student_tags": ["自然风光", "美食丰富", "住宿便宜"],
+    "transport": {
+      "high_speed_rail": false,
+      "rail_time": null,
+      "airport": true
+    },
+    "summary": "适合预算1000内、喜欢海滨度假、3-4天游",
+    "recommend_reasons": [
+      "海滨风光（亚龙湾、大东海、天涯海角）",
+      "气候宜人（冬季温暖，适合避寒）",
+      "住宿选择多（青旅、民宿、酒店）"
+    ],
+    "itinerary": [
+      "Day1：亚龙湾 → 大东海",
+      "Day2：天涯海角 → 南山寺",
+      "Day3：蜈支洲岛 → 下午返程"
+    ],
+    "trust_signals": {
+      "student_count": 155,
+      "click_count_7d": 102,
+      "is_popular": true,
+      "is_student_favorite": true
+    }
+  }
+]
+
