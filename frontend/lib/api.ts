@@ -138,3 +138,30 @@ export async function fetchDestinationDetail(
   }
 }
 
+/**
+ * 获取景点列表（学生向）
+ */
+export async function fetchAttractions(
+  city_name?: string,
+  type: 'student' | 'all' = 'student'
+): Promise<Attraction[]> {
+  try {
+    const params = new URLSearchParams({ type })
+    if (city_name) {
+      params.append('city_name', city_name)
+    }
+
+    const res = await fetch(`${API_URL}/api/attractions?${params.toString()}`)
+    const data: ApiResponse<{ list: Attraction[] }> = await res.json()
+
+    if (data.code === 200 && data.data?.list) {
+      return data.data.list
+    }
+
+    throw new Error(data.message || '获取景点列表失败')
+  } catch (error) {
+    console.error('获取景点列表失败:', error)
+    throw error
+  }
+}
+
