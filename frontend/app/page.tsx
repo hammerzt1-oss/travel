@@ -27,9 +27,13 @@ export default function Home() {
         fetchRecommendations('popular')
       ])
       
-      setWeekRecommendations(weekData)
-      setMonthRecommendations(monthData)
-      setPopularRecommendations(popularData)
+      // 添加调试日志
+      console.log('获取到的数据:', { weekData, monthData, popularData })
+      console.log('本周推荐数量:', weekData?.length)
+      
+      setWeekRecommendations(weekData || [])
+      setMonthRecommendations(monthData || [])
+      setPopularRecommendations(popularData || [])
     } catch (error) {
       console.error('获取推荐失败:', error)
       setError('获取推荐失败，请稍后重试')

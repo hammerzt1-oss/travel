@@ -57,3 +57,4 @@ export function shouldUsePlaceholder(imagePath: string | null | undefined): bool
   return imagePath.includes('placeholder') || imagePath === ''
 }
 
+
