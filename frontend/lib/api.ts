@@ -55,6 +55,26 @@ export interface DestinationDetail {
   }
 }
 
+export interface Attraction {
+  id: number
+  city: string
+  name: string
+  category: string
+  student_ticket: boolean
+  price_hint: string
+  primary_reason: string
+  suitable_days: string
+  transport: string
+  photo_friendly: boolean
+  trust_signals: {
+    student_count: number
+    is_student_favorite?: boolean
+    click_count_7d?: number
+  }
+  cta_text: string
+  cta_link: string
+}
+
 interface ApiResponse<T> {
   code: number
   message: string

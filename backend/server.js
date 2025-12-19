@@ -88,6 +88,13 @@ const getDestinations = () => {
   });
 };
 
+// 读取景点数据
+const getAttractions = () => {
+  const dataPath = path.join(__dirname, '../data/attractions.json');
+  const data = fs.readFileSync(dataPath, 'utf8');
+  return JSON.parse(data);
+};
+
 // 推荐列表API（核心）
 app.get('/api/recommendations', (req, res) => {
   try {
@@ -553,6 +560,17 @@ function generateOTALinks(destination, origin = '北京') {
   return links;
 }
 
+// 景点OTA链接生成函数
+function generateAttractionOtaUrl(attractionId) {
+  const ALLIANCE_ID = process.env.ALLIANCE_ID || '7463534';
+  const OTA_PID = process.env.OTA_PID || process.env.CTRIP_PID || '284116645';
+  const OUID = process.env.OUID || 'kfptpcljzh';
+  
+  // 携程景点门票链接格式：https://piao.ctrip.com/ticket/dest/t{attraction_id}.html
+  // ⚠️ 重要：学生票由携程页面自动展示，不需要在URL中指定
+  return `https://piao.ctrip.com/ticket/dest/t${attractionId}.html?AllianceID=${ALLIANCE_ID}&sid=${OTA_PID}&ouid=${OUID}`;
+}
+
 // 获取城市列表API（用于出发地选择）
 app.get('/api/cities', (req, res) => {
   try {
@@ -654,6 +672,82 @@ app.post('/api/admin/update-trust-signals', (req, res) => {
       });
     }
   } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '服务器错误',
+      error: error.message
+    });
+  }
+});
+
+// 景点列表API（学生向）
+app.get('/api/attractions', (req, res) => {
+  try {
+    const { city_name, city, type = 'student' } = req.query;
+    const attractions = getAttractions();
+    
+    // 根据城市筛选
+    let filtered = attractions;
+    if (city_name) {
+      filtered = attractions.filter(a => a.city_name === city_name);
+    } else if (city) {
+      filtered = attractions.filter(a => a.city === city || a.city_name === city);
+    }
+    
+    // 学生向筛选：只返回学生友好的景点
+    if (type === 'student') {
+      filtered = filtered.filter(a => a.student_friendly && a.student_ticket);
+    }
+    
+    // 按学生选择量排序
+    filtered.sort((a, b) => {
+      const aCount = a.trust_signals?.student_count || 0;
+      const bCount = b.trust_signals?.student_count || 0;
+      return bCount - aCount;
+    });
+    
+    // 每个城市最多返回5个
+    const cityGroups = {};
+    filtered.forEach(attraction => {
+      const cityKey = attraction.city_name || attraction.city;
+      if (!cityGroups[cityKey]) {
+        cityGroups[cityKey] = [];
+      }
+      if (cityGroups[cityKey].length < 5) {
+        cityGroups[cityKey].push(attraction);
+      }
+    });
+    
+    // 扁平化结果
+    const result = Object.values(cityGroups).flat();
+    
+    // 格式化返回数据
+    const formatted = result.map(attraction => ({
+      id: attraction.id,
+      city: attraction.city_name || attraction.city,
+      name: attraction.name,
+      category: attraction.category,
+      student_ticket: attraction.student_ticket,
+      price_hint: attraction.price_hint,
+      primary_reason: attraction.primary_reason,
+      suitable_days: attraction.suitable_days,
+      transport: attraction.transport,
+      photo_friendly: attraction.photo_friendly,
+      trust_signals: attraction.trust_signals || {},
+      cta_text: '查看学生票',
+      cta_link: generateAttractionOtaUrl(attraction.id)
+    }));
+    
+    res.json({
+      code: 200,
+      message: 'success',
+      data: {
+        list: formatted,
+        total: formatted.length
+      }
+    });
+  } catch (error) {
+    console.error('景点列表API错误:', error);
     res.status(500).json({
       code: 500,
       message: '服务器错误',

@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import RecommendationCard from '@/components/RecommendationCard'
-import { fetchRecommendations, type Recommendation } from '@/lib/api'
+import AttractionCard from '@/components/AttractionCard'
+import { fetchRecommendations, fetchAttractions, type Recommendation, type Attraction } from '@/lib/api'
 import { provincesAndCities, getAllProvinces, getCitiesByProvince } from '@/lib/cities'
 
 export default function Home() {
   const [weekRecommendations, setWeekRecommendations] = useState<Recommendation[]>([])
   const [monthRecommendations, setMonthRecommendations] = useState<Recommendation[]>([])
   const [popularRecommendations, setPopularRecommendations] = useState<Recommendation[]>([])
+  const [attractions, setAttractions] = useState<Attraction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [origin, setOrigin] = useState<string>('北京') // 默认出发地
@@ -25,11 +27,12 @@ export default function Home() {
     setError(null)
     
     try {
-      // 并行请求三个推荐列表，传递出发地参数
-      const [weekData, monthData, popularData] = await Promise.all([
+      // 并行请求三个推荐列表和景点列表，传递出发地参数
+      const [weekData, monthData, popularData, attractionsData] = await Promise.all([
         fetchRecommendations('week', origin),
         fetchRecommendations('month', origin),
-        fetchRecommendations('popular', origin)
+        fetchRecommendations('popular', origin),
+        fetchAttractions(undefined, 'student')
       ])
       
       // 添加调试日志
@@ -39,6 +42,7 @@ export default function Home() {
       setWeekRecommendations(weekData || [])
       setMonthRecommendations(monthData || [])
       setPopularRecommendations(popularData || [])
+      setAttractions(attractionsData || [])
     } catch (error) {
       console.error('获取推荐失败:', error)
       setError('获取推荐失败，请稍后重试')
@@ -242,6 +246,30 @@ export default function Home() {
           ) : (
             <div className="text-center py-12 text-gray-500">
               <p>暂无学生常选推荐</p>
+            </div>
+          )}
+        </section>
+
+        {/* 学生必去景点 */}
+        <section className="mb-8 sm:mb-12">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
+            🎫 学生必去景点（当天可玩）
+          </h2>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white rounded-xl shadow-md h-64 sm:h-80 animate-pulse" />
+              ))}
+            </div>
+          ) : attractions.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {attractions.slice(0, 9).map(attraction => (
+                <AttractionCard key={attraction.id} attraction={attraction} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <p>暂无景点推荐</p>
             </div>
           )}
         </section>
