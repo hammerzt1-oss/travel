@@ -202,6 +202,46 @@ export default function Home() {
           </div>
         )}
 
+        {/* 酒店优惠券 - 放在最顶部 */}
+        <section className="mb-8 sm:mb-12">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
+            🏨 酒店优惠券（全国通用）
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+            <HotelCouponCard
+              price={69}
+              title="全国惠选酒店通用券"
+              description="覆盖全国多城市 · 性价比之选"
+              link="https://t.ctrip.cn/AlqONib"
+            />
+            <HotelCouponCard
+              price={99}
+              title="全国经济酒店通用券"
+              description="适合出差 / 预算旅行"
+              link="https://t.ctrip.cn/AKW7JvR"
+            />
+            <HotelCouponCard
+              price={129}
+              title="全国悦享酒店通用券"
+              description="品质升级 · 舒适入住"
+              link="https://t.ctrip.cn/tdl7mS5"
+              recommended={true}
+            />
+            <HotelCouponCard
+              price={159}
+              title="全国舒适酒店通用券"
+              description="舒适体验 · 商务首选"
+              link="https://t.ctrip.cn/jwrPXEY"
+            />
+            <HotelCouponCard
+              price={199}
+              title="全国优质酒店通用券"
+              description="高端品质 · 尊享体验"
+              link="https://t.ctrip.cn/Bl4YADl"
+            />
+          </div>
+        </section>
+
         {/* 本周推荐 - 首屏最重要 */}
         <section className="mb-8 sm:mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
@@ -304,46 +344,6 @@ export default function Home() {
               <p>暂无景点推荐</p>
             </div>
           )}
-        </section>
-
-        {/* 酒店优惠券 */}
-        <section className="mb-8 sm:mb-12">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
-            🏨 酒店优惠券（全国通用）
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
-            <HotelCouponCard
-              price={69}
-              title="全国惠选酒店通用券"
-              description="覆盖全国多城市 · 性价比之选"
-              link="https://t.ctrip.cn/AlqONib"
-            />
-            <HotelCouponCard
-              price={99}
-              title="全国经济酒店通用券"
-              description="适合出差 / 预算旅行"
-              link="https://t.ctrip.cn/AKW7JvR"
-            />
-            <HotelCouponCard
-              price={129}
-              title="全国悦享酒店通用券"
-              description="品质升级 · 舒适入住"
-              link="https://t.ctrip.cn/tdl7mS5"
-              recommended={true}
-            />
-            <HotelCouponCard
-              price={159}
-              title="全国舒适酒店通用券"
-              description="舒适体验 · 商务首选"
-              link="https://t.ctrip.cn/jwrPXEY"
-            />
-            <HotelCouponCard
-              price={199}
-              title="全国优质酒店通用券"
-              description="高端品质 · 尊享体验"
-              link="https://t.ctrip.cn/Bl4YADl"
-            />
-          </div>
         </section>
       </div>
     </main>

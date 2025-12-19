@@ -691,7 +691,7 @@ app.get('/api/attractions', (req, res) => {
         view_count_7d: attraction.trust_signals?.click_count_7d || 0,
         click_count_7d: attraction.trust_signals?.click_count_7d || 0
       },
-      cta_text: '寻找酒店', // 成人票，官方直订
+      cta_text: '立即预订', // 官方直订
       cta_link: generateAttractionOtaUrl(attraction.id)
     }));
     
