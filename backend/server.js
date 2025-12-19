@@ -632,55 +632,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 404处理
-app.use((req, res) => {
-  res.status(404).json({
-    code: 404,
-    message: '接口不存在',
-    path: req.path
-  });
-});
-
-// 全局错误处理
-app.use((err, req, res, next) => {
-  console.error('未处理的错误:', err);
-  res.status(500).json({
-    code: 500,
-    message: '服务器内部错误',
-    error: process.env.NODE_ENV === 'development' ? err.message : '服务器错误'
-  });
-});
-
-// 手动触发更新接口（用于测试和管理）
-app.post('/api/admin/update-trust-signals', (req, res) => {
-  try {
-    const result = updateTrustSignals();
-    if (result.success) {
-      res.json({
-        code: 200,
-        message: '信任信号更新成功',
-        data: {
-          updated: result.updated,
-          timestamp: new Date().toISOString()
-        }
-      });
-    } else {
-      res.status(500).json({
-        code: 500,
-        message: '信任信号更新失败',
-        error: result.error
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      code: 500,
-      message: '服务器错误',
-      error: error.message
-    });
-  }
-});
-
-// 景点列表API（学生向）
+// 景点列表API（学生向）- 必须在404处理之前
 app.get('/api/attractions', (req, res) => {
   try {
     const { city_name, city, type = 'student' } = req.query;
@@ -756,12 +708,61 @@ app.get('/api/attractions', (req, res) => {
   }
 });
 
+// 手动触发更新接口（用于测试和管理）
+app.post('/api/admin/update-trust-signals', (req, res) => {
+  try {
+    const result = updateTrustSignals();
+    if (result.success) {
+      res.json({
+        code: 200,
+        message: '信任信号更新成功',
+        data: {
+          updated: result.updated,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } else {
+      res.status(500).json({
+        code: 500,
+        message: '信任信号更新失败',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      code: 500,
+      message: '服务器错误',
+      error: error.message
+    });
+  }
+});
+
+// 404处理
+app.use((req, res) => {
+  res.status(404).json({
+    code: 404,
+    message: '接口不存在',
+    path: req.path
+  });
+});
+
+// 全局错误处理
+app.use((err, req, res, next) => {
+  console.error('服务器错误:', err);
+  res.status(500).json({
+    code: 500,
+    message: '服务器内部错误',
+    error: err.message
+  });
+});
+
 // 启动服务
 app.listen(PORT, () => {
   console.log(`🚀 后端服务运行在 http://localhost:${PORT}`);
   console.log(`📡 API地址: http://localhost:${PORT}/api/recommendations`);
   console.log(`💚 健康检查: http://localhost:${PORT}/health`);
   console.log(`📋 城市列表: http://localhost:${PORT}/api/cities`);
+  console.log(`🎫 景点列表: http://localhost:${PORT}/api/attractions`);
   console.log(`🔧 信任信号更新: POST http://localhost:${PORT}/api/admin/update-trust-signals`);
   
   // 检查环境变量
