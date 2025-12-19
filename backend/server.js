@@ -171,7 +171,7 @@ app.get('/api/recommendations', (req, res) => {
         is_popular: dest.trust_signals.is_popular || false
       },
       cover_image: dest.cover_image,
-        cta_text: '立即预订', // 成人票，官方直订
+        cta_text: '寻找酒店', // 成人票，官方直订
         cta_links: cta_links  // 添加OTA链接
       };
     });
@@ -232,7 +232,11 @@ app.get('/api/destinations/:id', (req, res) => {
         id: destination.id,
         name: destination.name,
         summary: destination.summary,
-        recommend_reasons: destination.recommend_reasons,
+        recommend_reasons: destination.recommend_reasons.map(reason => 
+          reason.replace(/学生友好/g, '安全可靠')
+               .replace(/学生票多/g, '门票丰富')
+               .replace(/学生/g, '')
+        ),
         itinerary: destination.itinerary,
         budget_range: destination.budget_range,
         trust_signals: destination.trust_signals,
@@ -687,7 +691,7 @@ app.get('/api/attractions', (req, res) => {
         view_count_7d: attraction.trust_signals?.click_count_7d || 0,
         click_count_7d: attraction.trust_signals?.click_count_7d || 0
       },
-      cta_text: '立即预订', // 成人票，官方直订
+      cta_text: '寻找酒店', // 成人票，官方直订
       cta_link: generateAttractionOtaUrl(attraction.id)
     }));
     
