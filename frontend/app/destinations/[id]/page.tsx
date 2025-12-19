@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { fetchDestinationDetail, type DestinationDetail } from '@/lib/api'
 import { getCityGradient, shouldUsePlaceholder } from '@/lib/cityGradients'
@@ -9,22 +9,27 @@ import { getCityGradient, shouldUsePlaceholder } from '@/lib/cityGradients'
 export default function DestinationDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [destination, setDestination] = useState<DestinationDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // ⚠️ 重要：从 URL 的 query 参数中获取 origin，如果没有则使用默认值"北京"
+  const origin = searchParams.get('origin') || '北京'
 
   useEffect(() => {
     if (params.id) {
       fetchDestination()
     }
-  }, [params.id])
+  }, [params.id, origin])
 
   const fetchDestination = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const data = await fetchDestinationDetail(params.id as string)
+      // ⚠️ 重要：传递 origin 参数给 API，确保生成的链接使用正确的出发地
+      const data = await fetchDestinationDetail(params.id as string, origin)
       setDestination(data)
     } catch (error) {
       console.error('获取目的地详情失败:', error)

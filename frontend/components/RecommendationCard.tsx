@@ -42,7 +42,8 @@ export default function RecommendationCard({ recommendation, origin = '北京' }
   const usePlaceholder = shouldUsePlaceholder(recommendation.cover_image) || imageError
 
   const handleClick = () => {
-    router.push(`/destinations/${recommendation.id}`)
+    // ⚠️ 重要：跳转详情页时必须传递 origin 参数，否则详情页会使用默认值"北京"
+    router.push(`/destinations/${recommendation.id}?origin=${encodeURIComponent(origin)}`)
   }
 
   const handleCTAClick = (e: React.MouseEvent) => {

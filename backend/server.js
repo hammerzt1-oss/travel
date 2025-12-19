@@ -92,6 +92,8 @@ const getDestinations = () => {
 app.get('/api/recommendations', (req, res) => {
   try {
     const { origin, type = 'week' } = req.query;
+    // 调试日志：检查接收到的 origin 参数
+    console.log('[推荐列表API] 接收到的参数 - origin:', origin, 'type:', type);
     const destinations = getDestinations();
     
     // 根据推荐类型筛选
@@ -136,8 +138,12 @@ app.get('/api/recommendations', (req, res) => {
       }
       
       // 生成OTA跳转链接（后端统一生成，所有参数在后端）
-      // ⚠️ 重要：如果没有传入origin，默认使用"北京"作为出发地
+      // ⚠️ 重要：使用传入的 origin 参数，如果没有则默认使用"北京"
       const defaultOrigin = origin || '北京';
+      // 调试日志：确认使用的出发地
+      if (dest.id === 2) { // 只对苏州记录日志，避免日志过多
+        console.log('[推荐列表API] 生成链接 - 目的地:', dest.name, '出发地:', defaultOrigin, '原始origin参数:', origin);
+      }
       const cta_links = generateOTALinks(dest, defaultOrigin);
       
       return {
@@ -189,6 +195,17 @@ app.get('/api/destinations/:id', (req, res) => {
   try {
     const { id } = req.params;
     const { origin } = req.query;
+    
+    // ⚠️ 重要：详情页请求必须包含 origin 参数，否则无法生成正确的链接
+    // 🔥 这是"钱"的参数，不能使用默认值，必须显式传递
+    if (!origin) {
+      console.warn('[详情页API] ⚠️ 缺少 origin 参数，请求ID:', id);
+      return res.status(400).json({
+        code: 400,
+        message: '缺少 origin 参数，请从首页选择出发地后进入详情页',
+        error: '详情页请求必须包含出发地参数'
+      });
+    }
     const destinations = getDestinations();
     const destination = destinations.find(d => d.id === parseInt(id));
     
@@ -458,7 +475,11 @@ function generateOTALinks(destination, origin = '北京') {
   const utm_source = 'travel_student';
   
   // ⚠️ 重要：确保origin有值，默认为"北京"
+  // 🔥 关键：使用传入的 origin 参数，不要固定为"北京"
   const actualOrigin = origin || '北京';
+  
+  // 调试日志：确认接收到的参数
+  console.log('[OTA链接生成] 接收到的参数 - origin:', origin, 'actualOrigin:', actualOrigin);
   
   // ⚠️ 关键修复：只使用 city_name，禁止 fallback
   // 如果 city_name 不存在，直接报错，避免跳错城市
@@ -468,7 +489,7 @@ function generateOTALinks(destination, origin = '北京') {
   
   const targetCityName = destination.city_name;
   
-  // 调试日志：确认目标城市
+  // 调试日志：确认目标城市和出发地
   console.log('[OTA链接生成] 目标城市:', targetCityName, '出发地:', actualOrigin);
   
   // 从统一数据结构获取城市信息
@@ -503,12 +524,17 @@ function generateOTALinks(destination, origin = '北京') {
   // 套餐链接也需要使用城市代码
   // 如果所有城市都显示同一个城市，说明城市代码映射不正确
   
+  // 调试日志：输出最终生成的链接参数
+  console.log('[OTA链接生成] 火车票链接 - dStation:', originName, 'aStation:', cityName);
+  console.log('[OTA链接生成] 火车票链接 - 出发地:', actualOrigin, '目的地:', targetCityName);
+  
   const links = {
     // 酒店链接：使用正确的城市代码（已从ChatGPT获取，2025-12-18）
     // ⚠️ 注意：参数顺序可能影响链接正确性，city参数应该在最前面
     // 格式：city=城市代码&AllianceID&sid&ouid
     hotel: `https://hotels.ctrip.com/hotels/list?city=${cityCode}&AllianceID=${ALLIANCE_ID}&sid=${OTA_PID}&ouid=${OUID}`,
     // 火车票链接：使用携程标准格式，显式携带 ticketType=0
+    // ⚠️ 重要：dStation 使用用户选择的出发地（actualOrigin），不是固定的"北京"
     // dStation/aStation 使用 URL 编码的中文城市名
     transport: `https://trains.ctrip.com/webapp/train/list?ticketType=0&dStation=${originName}&aStation=${cityName}&AllianceID=${ALLIANCE_ID}&sid=${OTA_PID}&ouid=${OUID}`,
     // 度假产品/套餐链接：使用正确的格式
