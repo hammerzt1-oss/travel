@@ -32,9 +32,10 @@ interface Recommendation {
 
 interface Props {
   recommendation: Recommendation
+  origin?: string // 出发地，用于更新CTA链接
 }
 
-export default function RecommendationCard({ recommendation }: Props) {
+export default function RecommendationCard({ recommendation, origin = '北京' }: Props) {
   const router = useRouter()
   const [imageError, setImageError] = useState(false)
   const gradient = getCityGradient(recommendation.name)

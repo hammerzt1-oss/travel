@@ -23,6 +23,11 @@ export interface Recommendation {
   }
   cover_image: string
   cta_text: string
+  cta_links?: {
+    hotel: string
+    transport: string
+    package: string
+  }
 }
 
 export interface DestinationDetail {

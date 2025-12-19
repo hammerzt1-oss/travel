@@ -10,21 +10,26 @@ export default function Home() {
   const [popularRecommendations, setPopularRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [origin, setOrigin] = useState<string>('北京') // 默认出发地
+  const [showOriginSelector, setShowOriginSelector] = useState(false)
+
+  // 常用出发城市列表
+  const originCities = ['北京', '上海', '广州', '深圳', '杭州', '南京', '成都', '武汉', '西安', '重庆']
 
   useEffect(() => {
     fetchAllRecommendations()
-  }, [])
+  }, [origin])
 
   const fetchAllRecommendations = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      // 并行请求三个推荐列表
+      // 并行请求三个推荐列表，传递出发地参数
       const [weekData, monthData, popularData] = await Promise.all([
-        fetchRecommendations('week'),
-        fetchRecommendations('month'),
-        fetchRecommendations('popular')
+        fetchRecommendations('week', origin),
+        fetchRecommendations('month', origin),
+        fetchRecommendations('popular', origin)
       ])
       
       // 添加调试日志
@@ -52,9 +57,46 @@ export default function Home() {
             <h1 className="text-xl sm:text-2xl font-bold text-primary-600">
               🎒 学生旅游推荐
             </h1>
-            <button className="text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors">
-              筛选
-            </button>
+            <div className="flex items-center gap-3">
+              {/* 出发地选择器 */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowOriginSelector(!showOriginSelector)}
+                  className="text-sm sm:text-base text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors border border-gray-200 flex items-center gap-2"
+                >
+                  <span>📍 出发地：{origin}</span>
+                  <span className="text-xs">▼</span>
+                </button>
+                {/* 下拉菜单 */}
+                {showOriginSelector && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setShowOriginSelector(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
+                      {originCities.map((city) => (
+                        <button
+                          key={city}
+                          onClick={() => {
+                            setOrigin(city)
+                            setShowOriginSelector(false)
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                            origin === city ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-700'
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              <button className="text-sm sm:text-base text-gray-600 hover:text-gray-900 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors">
+                筛选
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -122,7 +164,7 @@ export default function Home() {
           ) : monthRecommendations.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {monthRecommendations.map(rec => (
-                <RecommendationCard key={rec.id} recommendation={rec} />
+                <RecommendationCard key={rec.id} recommendation={rec} origin={origin} />
               ))}
             </div>
           ) : (
@@ -146,7 +188,7 @@ export default function Home() {
           ) : popularRecommendations.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {popularRecommendations.map(rec => (
-                <RecommendationCard key={rec.id} recommendation={rec} />
+                <RecommendationCard key={rec.id} recommendation={rec} origin={origin} />
               ))}
             </div>
           ) : (

@@ -14,7 +14,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/hangzhou.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "门票便宜"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "门票便宜"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1.5h",
@@ -35,7 +39,8 @@
       "click_count_7d": 85,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "杭州"
   },
   {
     "id": 2,
@@ -52,7 +57,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/suzhou.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "文化古迹"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "文化古迹"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1h",
@@ -73,7 +82,8 @@
       "click_count_7d": 72,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "苏州"
   },
   {
     "id": 3,
@@ -90,7 +100,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/nanjing.jpg",
-    "student_tags": ["住宿便宜", "地铁方便", "文化古迹"],
+    "student_tags": [
+      "住宿便宜",
+      "地铁方便",
+      "文化古迹"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1.5h",
@@ -111,7 +125,8 @@
       "click_count_7d": 78,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "南京"
   },
   {
     "id": 4,
@@ -128,7 +143,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/beijing.jpg",
-    "student_tags": ["地铁方便", "文化古迹", "门票便宜"],
+    "student_tags": [
+      "地铁方便",
+      "文化古迹",
+      "门票便宜"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "4.5h",
@@ -149,7 +168,8 @@
       "click_count_7d": 120,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "北京"
   },
   {
     "id": 5,
@@ -166,7 +186,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/shanghai.jpg",
-    "student_tags": ["地铁方便", "购物便利", "美食丰富"],
+    "student_tags": [
+      "地铁方便",
+      "购物便利",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -187,7 +211,8 @@
       "click_count_7d": 110,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "上海"
   },
   {
     "id": 6,
@@ -204,7 +229,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/chengdu.jpg",
-    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "student_tags": [
+      "美食丰富",
+      "住宿便宜",
+      "公交方便"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8h",
@@ -226,7 +255,8 @@
       "click_count_7d": 95,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "成都"
   },
   {
     "id": 7,
@@ -234,7 +264,7 @@
     "province": "重庆",
     "city": "重庆",
     "region": "西南地区",
-    "latitude": 29.5630,
+    "latitude": 29.563,
     "longitude": 106.5516,
     "description": "山城重庆，8D魔幻，适合探索游",
     "budget_range": "500-700",
@@ -243,7 +273,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/chongqing.jpg",
-    "student_tags": ["美食丰富", "住宿便宜", "交通便利"],
+    "student_tags": [
+      "美食丰富",
+      "住宿便宜",
+      "交通便利"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "7h",
@@ -265,7 +299,8 @@
       "click_count_7d": 88,
       "is_popular": true,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "重庆"
   },
   {
     "id": 8,
@@ -282,7 +317,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/xian.jpg",
-    "student_tags": ["文化古迹", "美食丰富", "住宿便宜"],
+    "student_tags": [
+      "文化古迹",
+      "美食丰富",
+      "住宿便宜"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5.5h",
@@ -304,7 +343,8 @@
       "click_count_7d": 82,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "西安"
   },
   {
     "id": 9,
@@ -321,7 +361,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/xiamen.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "6h",
@@ -343,7 +387,8 @@
       "click_count_7d": 92,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "厦门"
   },
   {
     "id": 10,
@@ -360,7 +405,11 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/qingdao.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -382,7 +431,8 @@
       "click_count_7d": 68,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "青岛"
   },
   {
     "id": 11,
@@ -399,7 +449,11 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/wuhan.jpg",
-    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "student_tags": [
+      "美食丰富",
+      "住宿便宜",
+      "公交方便"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "4.5h",
@@ -420,7 +474,8 @@
       "click_count_7d": 58,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "武汉"
   },
   {
     "id": 12,
@@ -437,7 +492,11 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/changsha.jpg",
-    "student_tags": ["美食丰富", "住宿便宜", "公交方便"],
+    "student_tags": [
+      "美食丰富",
+      "住宿便宜",
+      "公交方便"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -458,7 +517,8 @@
       "click_count_7d": 62,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "长沙"
   },
   {
     "id": 13,
@@ -475,7 +535,11 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/guangzhou.jpg",
-    "student_tags": ["美食丰富", "地铁方便", "住宿便宜"],
+    "student_tags": [
+      "美食丰富",
+      "地铁方便",
+      "住宿便宜"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8h",
@@ -496,7 +560,8 @@
       "click_count_7d": 75,
       "is_popular": true,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "广州"
   },
   {
     "id": 14,
@@ -513,7 +578,11 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/shenzhen.jpg",
-    "student_tags": ["地铁方便", "购物便利", "美食丰富"],
+    "student_tags": [
+      "地铁方便",
+      "购物便利",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8.5h",
@@ -534,7 +603,8 @@
       "click_count_7d": 65,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "深圳"
   },
   {
     "id": 15,
@@ -551,7 +621,11 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/tianjin.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "0.5h",
@@ -572,7 +646,8 @@
       "click_count_7d": 48,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "天津"
   },
   {
     "id": 16,
@@ -580,7 +655,7 @@
     "province": "辽宁",
     "city": "大连",
     "region": "东北地区",
-    "latitude": 38.9140,
+    "latitude": 38.914,
     "longitude": 121.6147,
     "description": "浪漫之都，海滨城市，适合休闲游",
     "budget_range": "600-800",
@@ -589,7 +664,11 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/dalian.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "6h",
@@ -611,7 +690,8 @@
       "click_count_7d": 55,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "大连"
   },
   {
     "id": 17,
@@ -628,7 +708,11 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/kunming.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "美食丰富"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "美食丰富"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "10h",
@@ -650,7 +734,8 @@
       "click_count_7d": 63,
       "is_popular": false,
       "is_student_favorite": false
-    }
+    },
+    "city_name": "昆明"
   },
   {
     "id": 18,
@@ -667,7 +752,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/guilin.jpg",
-    "student_tags": ["住宿便宜", "公交方便", "自然风光"],
+    "student_tags": [
+      "住宿便宜",
+      "公交方便",
+      "自然风光"
+    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "9h",
@@ -689,7 +778,8 @@
       "click_count_7d": 78,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "桂林"
   },
   {
     "id": 19,
@@ -697,7 +787,7 @@
     "province": "云南",
     "city": "丽江",
     "region": "西南地区",
-    "latitude": 26.8550,
+    "latitude": 26.855,
     "longitude": 100.2277,
     "description": "古城丽江，文艺小城，适合放松游",
     "budget_range": "600-800",
@@ -706,7 +796,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/lijiang.jpg",
-    "student_tags": ["住宿便宜", "美食丰富", "自然风光"],
+    "student_tags": [
+      "住宿便宜",
+      "美食丰富",
+      "自然风光"
+    ],
     "transport": {
       "high_speed_rail": false,
       "rail_time": null,
@@ -728,7 +822,8 @@
       "click_count_7d": 88,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "丽江"
   },
   {
     "id": 20,
@@ -745,7 +840,11 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/sanya.jpg",
-    "student_tags": ["自然风光", "美食丰富", "住宿便宜"],
+    "student_tags": [
+      "自然风光",
+      "美食丰富",
+      "住宿便宜"
+    ],
     "transport": {
       "high_speed_rail": false,
       "rail_time": null,
@@ -767,7 +866,7 @@
       "click_count_7d": 102,
       "is_popular": true,
       "is_student_favorite": true
-    }
+    },
+    "city_name": "三亚"
   }
 ]
-
