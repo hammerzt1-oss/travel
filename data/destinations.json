@@ -14,11 +14,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/hangzhou.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "门票便宜"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1.5h",
@@ -28,17 +23,15 @@
     "recommend_reasons": [
       "交通简单（高铁直达，1.5h）",
       "吃住便宜（青旅多，小吃丰富）",
-      "不踩雷（学生友好，安全可靠）"
+      "不踩雷（安全可靠，安全可靠）"
     ],
     "itinerary": [
       "Day1：上午高铁 → 下午西湖 → 晚上河坊街",
       "Day2：灵隐寺 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 120,
       "click_count_7d": 85,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "杭州"
   },
@@ -57,11 +50,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/suzhou.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "文化古迹"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1h",
@@ -70,7 +58,7 @@
     "summary": "适合预算700内、喜欢园林文化、周末游",
     "recommend_reasons": [
       "交通便利（高铁1小时直达）",
-      "门票便宜（学生票多）",
+      "门票便宜（门票丰富）",
       "文化底蕴深厚（园林、古镇）"
     ],
     "itinerary": [
@@ -78,10 +66,8 @@
       "Day2：虎丘 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 95,
       "click_count_7d": 72,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "苏州"
   },
@@ -100,11 +86,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/nanjing.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "地铁方便",
-      "文化古迹"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "1.5h",
@@ -121,10 +102,8 @@
       "Day2：总统府 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 110,
       "click_count_7d": 78,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "南京"
   },
@@ -143,11 +122,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/beijing.jpg",
-    "student_tags": [
-      "地铁方便",
-      "文化古迹",
-      "门票便宜"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "4.5h",
@@ -157,17 +131,15 @@
     "recommend_reasons": [
       "交通便利（高铁直达，地铁发达）",
       "景点丰富（故宫、天坛、颐和园）",
-      "学生票优惠多（大部分景点有学生价）"
+      "票优惠多（大部分景点有价）"
     ],
     "itinerary": [
       "Day1：天安门 → 故宫 → 景山公园",
       "Day2：天坛 → 前门大街 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 180,
       "click_count_7d": 120,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "北京"
   },
@@ -186,11 +158,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/shanghai.jpg",
-    "student_tags": [
-      "地铁方便",
-      "购物便利",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -207,10 +174,8 @@
       "Day2：田子坊 → 新天地 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 165,
       "click_count_7d": 110,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "上海"
   },
@@ -229,11 +194,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/chengdu.jpg",
-    "student_tags": [
-      "美食丰富",
-      "住宿便宜",
-      "公交方便"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8h",
@@ -251,10 +211,8 @@
       "Day3：都江堰 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 145,
       "click_count_7d": 95,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "成都"
   },
@@ -273,11 +231,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/chongqing.jpg",
-    "student_tags": [
-      "美食丰富",
-      "住宿便宜",
-      "交通便利"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "7h",
@@ -295,10 +248,8 @@
       "Day3：南山一棵树 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 130,
       "click_count_7d": 88,
-      "is_popular": true,
-      "is_student_favorite": false
+      "is_popular": true
     },
     "city_name": "重庆"
   },
@@ -317,11 +268,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/xian.jpg",
-    "student_tags": [
-      "文化古迹",
-      "美食丰富",
-      "住宿便宜"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5.5h",
@@ -331,7 +277,7 @@
     "recommend_reasons": [
       "历史底蕴深厚（兵马俑、大雁塔、古城墙）",
       "美食便宜（肉夹馍、凉皮、羊肉泡馍）",
-      "学生票优惠多（大部分景点有学生价）"
+      "票优惠多（大部分景点有价）"
     ],
     "itinerary": [
       "Day1：兵马俑 → 华清宫",
@@ -339,10 +285,8 @@
       "Day3：陕西历史博物馆 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 125,
       "click_count_7d": 82,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "西安"
   },
@@ -361,11 +305,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/xiamen.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "6h",
@@ -383,10 +322,8 @@
       "Day3：南普陀寺 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 140,
       "click_count_7d": 92,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "厦门"
   },
@@ -405,11 +342,6 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/qingdao.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -427,10 +359,8 @@
       "Day3：崂山 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 105,
       "click_count_7d": 68,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "青岛"
   },
@@ -449,11 +379,6 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/wuhan.jpg",
-    "student_tags": [
-      "美食丰富",
-      "住宿便宜",
-      "公交方便"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "4.5h",
@@ -470,10 +395,8 @@
       "Day2：东湖 → 楚河汉街 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 88,
       "click_count_7d": 58,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "武汉"
   },
@@ -492,11 +415,6 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/changsha.jpg",
-    "student_tags": [
-      "美食丰富",
-      "住宿便宜",
-      "公交方便"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "5h",
@@ -513,10 +431,8 @@
       "Day2：太平街 → 坡子街 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 92,
       "click_count_7d": 62,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "长沙"
   },
@@ -535,11 +451,6 @@
     "weekend_suitable": true,
     "popularity_level": "高",
     "cover_image": "/images/guangzhou.jpg",
-    "student_tags": [
-      "美食丰富",
-      "地铁方便",
-      "住宿便宜"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8h",
@@ -556,10 +467,8 @@
       "Day2：广州塔 → 珠江夜游 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 115,
       "click_count_7d": 75,
-      "is_popular": true,
-      "is_student_favorite": false
+      "is_popular": true
     },
     "city_name": "广州"
   },
@@ -578,11 +487,6 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/shenzhen.jpg",
-    "student_tags": [
-      "地铁方便",
-      "购物便利",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "8.5h",
@@ -599,10 +503,8 @@
       "Day2：深圳湾公园 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 98,
       "click_count_7d": 65,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "深圳"
   },
@@ -621,11 +523,6 @@
     "weekend_suitable": true,
     "popularity_level": "中",
     "cover_image": "/images/tianjin.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "0.5h",
@@ -642,10 +539,8 @@
       "Day2：五大道 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 75,
       "click_count_7d": 48,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "天津"
   },
@@ -664,11 +559,6 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/dalian.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "6h",
@@ -686,10 +576,8 @@
       "Day3：金石滩 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 82,
       "click_count_7d": 55,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "大连"
   },
@@ -708,11 +596,6 @@
     "weekend_suitable": false,
     "popularity_level": "中",
     "cover_image": "/images/kunming.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "美食丰富"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "10h",
@@ -730,10 +613,8 @@
       "Day3：滇池 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 95,
       "click_count_7d": 63,
-      "is_popular": false,
-      "is_student_favorite": false
+      "is_popular": false
     },
     "city_name": "昆明"
   },
@@ -752,11 +633,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/guilin.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "公交方便",
-      "自然风光"
-    ],
     "transport": {
       "high_speed_rail": true,
       "rail_time": "9h",
@@ -774,10 +650,8 @@
       "Day3：遇龙河 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 118,
       "click_count_7d": 78,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "桂林"
   },
@@ -796,11 +670,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/lijiang.jpg",
-    "student_tags": [
-      "住宿便宜",
-      "美食丰富",
-      "自然风光"
-    ],
     "transport": {
       "high_speed_rail": false,
       "rail_time": null,
@@ -818,10 +687,8 @@
       "Day3：拉市海 → 束河古镇 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 135,
       "click_count_7d": 88,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "丽江"
   },
@@ -840,11 +707,6 @@
     "weekend_suitable": false,
     "popularity_level": "高",
     "cover_image": "/images/sanya.jpg",
-    "student_tags": [
-      "自然风光",
-      "美食丰富",
-      "住宿便宜"
-    ],
     "transport": {
       "high_speed_rail": false,
       "rail_time": null,
@@ -862,10 +724,8 @@
       "Day3：蜈支洲岛 → 下午返程"
     ],
     "trust_signals": {
-      "student_count": 155,
       "click_count_7d": 102,
-      "is_popular": true,
-      "is_student_favorite": true
+      "is_popular": true
     },
     "city_name": "三亚"
   }

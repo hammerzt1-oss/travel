@@ -91,7 +91,9 @@ export async function fetchRecommendations(
       params.append('origin', origin)
     }
 
-    const res = await fetch(`${API_URL}/api/recommendations?${params.toString()}`)
+    const res = await fetch(`${API_URL}/api/recommendations?${params.toString()}`, {
+      cache: 'no-store'
+    })
     
     if (!res.ok) {
       throw new Error(`HTTP错误: ${res.status} ${res.statusText}`)
@@ -126,7 +128,9 @@ export async function fetchDestinationDetail(
     const queryString = params.toString()
     const url = `${API_URL}/api/destinations/${id}${queryString ? `?${queryString}` : ''}`
 
-    const res = await fetch(url)
+    const res = await fetch(url, {
+      cache: 'no-store'
+    })
     const data: ApiResponse<DestinationDetail> = await res.json()
 
     if (data.code === 200 && data.data) {
@@ -153,7 +157,9 @@ export async function fetchAttractions(
       params.append('city_name', city_name)
     }
 
-    const res = await fetch(`${API_URL}/api/attractions?${params.toString()}`)
+    const res = await fetch(`${API_URL}/api/attractions?${params.toString()}`, {
+      cache: 'no-store'
+    })
     
     if (!res.ok) {
       throw new Error(`HTTP错误: ${res.status} ${res.statusText}`)

@@ -5,15 +5,12 @@
     "city_name": "北京",
     "name": "故宫博物院",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生票半价",
-    "primary_reason": "学生票半价 · 必打卡",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 必打卡",
     "suitable_days": "0.5-1天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 12000,
       "is_student_favorite": true,
       "click_count_7d": 850
     }
@@ -24,15 +21,12 @@
     "city_name": "北京",
     "name": "中国国家博物馆",
     "category": "博物馆",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "多数特展学生优惠",
-    "primary_reason": "学生优惠 · 文化必去",
+    "price_hint": "多数特展官方优惠",
+    "primary_reason": "官方优惠 · 文化必去",
     "suitable_days": "0.5-1天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 9800,
       "is_student_favorite": true,
       "click_count_7d": 720
     }
@@ -43,15 +37,12 @@
     "city_name": "北京",
     "name": "颐和园",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生半价",
-    "primary_reason": "学生半价 · 半天可逛",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 半天可逛",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 11000,
       "is_student_favorite": true,
       "click_count_7d": 680
     }
@@ -62,15 +53,12 @@
     "city_name": "北京",
     "name": "天坛公园",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生票稳定",
-    "primary_reason": "学生票稳定 · 拍照友好",
+    "price_hint": "官方稳定",
+    "primary_reason": "官方稳定 · 拍照友好",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 8500,
       "is_student_favorite": true,
       "click_count_7d": 520
     }
@@ -81,15 +69,12 @@
     "city_name": "上海",
     "name": "上海博物馆",
     "category": "博物馆",
-    "student_friendly": true,
-    "student_ticket": true,
     "price_hint": "常设展免费",
-    "primary_reason": "免费参观 · 学生必去",
+    "primary_reason": "免费参观 · 官方必去",
     "suitable_days": "0.5-1天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 9200,
       "is_student_favorite": true,
       "click_count_7d": 650
     }
@@ -100,15 +85,12 @@
     "city_name": "上海",
     "name": "东方明珠",
     "category": "地标",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生优惠票",
-    "primary_reason": "学生优惠 · 地标打卡",
+    "price_hint": "官方优惠票",
+    "primary_reason": "官方优惠 · 地标打卡",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 10500,
       "is_student_favorite": true,
       "click_count_7d": 780
     }
@@ -119,15 +101,12 @@
     "city_name": "上海",
     "name": "豫园",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "部分展区学生票",
-    "primary_reason": "学生票 · 文化体验",
+    "price_hint": "部分展区官方",
+    "primary_reason": "官方 · 文化体验",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 6800,
       "is_student_favorite": false,
       "click_count_7d": 420
     }
@@ -138,15 +117,12 @@
     "city_name": "上海",
     "name": "中共一大会址",
     "category": "红色教育",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生友好",
-    "primary_reason": "学生友好 · 免费参观",
+    "price_hint": "官方友好",
+    "primary_reason": "官方友好 · 免费参观",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 5600,
       "is_student_favorite": true,
       "click_count_7d": 380
     }
@@ -157,15 +133,12 @@
     "city_name": "苏州",
     "name": "苏州博物馆",
     "category": "博物馆",
-    "student_friendly": true,
-    "student_ticket": true,
     "price_hint": "免费参观",
-    "primary_reason": "免费 · 学生必去",
+    "primary_reason": "免费 · 官方必去",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 6800,
       "is_student_favorite": true,
       "click_count_7d": 520
     }
@@ -176,15 +149,12 @@
     "city_name": "苏州",
     "name": "拙政园",
     "category": "园林",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生半价",
-    "primary_reason": "学生半价 · 园林必看",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 园林必看",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 9500,
       "is_student_favorite": true,
       "click_count_7d": 720
     }
@@ -195,15 +165,12 @@
     "city_name": "苏州",
     "name": "狮子林",
     "category": "园林",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生半价",
-    "primary_reason": "学生半价 · 拍照好看",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 拍照好看",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 7200,
       "is_student_favorite": true,
       "click_count_7d": 580
     }
@@ -214,15 +181,12 @@
     "city_name": "苏州",
     "name": "留园",
     "category": "园林",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生半价",
-    "primary_reason": "学生半价 · 半天不累",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 半天不累",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 6500,
       "is_student_favorite": true,
       "click_count_7d": 480
     }
@@ -233,15 +197,12 @@
     "city_name": "杭州",
     "name": "西湖风景区",
     "category": "自然风光",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "部分景点学生票",
-    "primary_reason": "学生票 · 免费区域多",
+    "price_hint": "部分景点官方",
+    "primary_reason": "官方 · 免费区域多",
     "suitable_days": "0.5-1天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 15000,
       "is_student_favorite": true,
       "click_count_7d": 1200
     }
@@ -252,15 +213,12 @@
     "city_name": "杭州",
     "name": "灵隐寺",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生优惠",
-    "primary_reason": "学生优惠 · 文化体验",
+    "price_hint": "官方优惠",
+    "primary_reason": "官方优惠 · 文化体验",
     "suitable_days": "0.5天",
     "transport": "公交直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 8800,
       "is_student_favorite": true,
       "click_count_7d": 650
     }
@@ -271,15 +229,12 @@
     "city_name": "杭州",
     "name": "雷峰塔",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "学生半价",
-    "primary_reason": "学生半价 · 地标打卡",
+    "price_hint": "官方半价",
+    "primary_reason": "官方半价 · 地标打卡",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 7200,
       "is_student_favorite": true,
       "click_count_7d": 580
     }
@@ -290,15 +245,12 @@
     "city_name": "南京",
     "name": "南京博物院",
     "category": "博物馆",
-    "student_friendly": true,
-    "student_ticket": true,
     "price_hint": "免费参观",
-    "primary_reason": "免费 · 学生必去",
+    "primary_reason": "免费 · 官方必去",
     "suitable_days": "0.5-1天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 11200,
       "is_student_favorite": true,
       "click_count_7d": 850
     }
@@ -309,15 +261,12 @@
     "city_name": "南京",
     "name": "中山陵",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
     "price_hint": "免费参观",
     "primary_reason": "免费 · 拍照友好",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 9800,
       "is_student_favorite": true,
       "click_count_7d": 720
     }
@@ -328,18 +277,14 @@
     "city_name": "南京",
     "name": "夫子庙",
     "category": "文化历史",
-    "student_friendly": true,
-    "student_ticket": true,
-    "price_hint": "部分景点学生票",
-    "primary_reason": "学生票 · 文化体验",
+    "price_hint": "部分景点官方",
+    "primary_reason": "官方 · 文化体验",
     "suitable_days": "0.5天",
     "transport": "地铁直达",
     "photo_friendly": true,
     "trust_signals": {
-      "student_count": 10500,
       "is_student_favorite": true,
       "click_count_7d": 780
     }
   }
 ]
-

@@ -12,11 +12,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// 请求日志中间件
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
+// 请求日志中间件 + 缓存控制
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    // 禁用缓存，确保数据实时性
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
 
 // 简单的内存限流（MVP阶段，后续可升级为Redis）
 const rateLimitMap = new Map();
@@ -116,11 +120,6 @@ app.get('/api/recommendations', (req, res) => {
       // 热门推荐：按点击量排序
       filtered = destinations
         .filter(d => d.trust_signals.is_popular)
-        .sort((a, b) => b.trust_signals.click_count_7d - a.trust_signals.click_count_7d);
-    } else if (type === 'student_favorite' || type === 'popular') {
-      // 热门推荐：按点击量排序
-      filtered = destinations
-        .filter(d => d.trust_signals.is_popular)
         .sort((a, b) => (b.trust_signals.click_count_7d || 0) - (a.trust_signals.click_count_7d || 0));
     }
     
@@ -138,7 +137,7 @@ app.get('/api/recommendations', (req, res) => {
         tag = '周末推荐';
       } else if (type === 'month') {
         tag = '本月推荐';
-      } else if (type === 'popular' || type === 'student_favorite') {
+      } else if (type === 'popular') {
         tag = '热门推荐';
       }
       
@@ -649,7 +648,7 @@ app.get('/api/attractions', (req, res) => {
     
     // 热门筛选：只返回热门景点（成人票）
     // ⚠️ 重要：本产品仅展示成人可购、可返佣的产品
-    if (type === 'popular' || type === 'student') {
+    if (type === 'popular') {
       filtered = filtered.filter(a => a.trust_signals?.is_popular || (a.trust_signals?.click_count_7d || 0) > 500);
     }
     
@@ -762,13 +761,21 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务
-app.listen(PORT, () => {
-  console.log(`🚀 后端服务运行在 http://localhost:${PORT}`);
-  console.log(`📡 API地址: http://localhost:${PORT}/api/recommendations`);
-  console.log(`💚 健康检查: http://localhost:${PORT}/health`);
-  console.log(`📋 城市列表: http://localhost:${PORT}/api/cities`);
-  console.log(`🎫 景点列表: http://localhost:${PORT}/api/attractions`);
-  console.log(`🔧 信任信号更新: POST http://localhost:${PORT}/api/admin/update-trust-signals`);
+app.listen(PORT, '0.0.0.0', () => {
+  // 获取实际的服务URL（生产环境可能是Render等平台分配的URL）
+  const isProduction = process.env.NODE_ENV === 'production';
+  const serviceUrl = process.env.RENDER_EXTERNAL_URL || process.env.RAILWAY_PUBLIC_DOMAIN || `http://localhost:${PORT}`;
+  
+  console.log(`🚀 后端服务已启动`);
+  console.log(`📌 监听端口: ${PORT}`);
+  if (isProduction && serviceUrl !== `http://localhost:${PORT}`) {
+    console.log(`🌐 公网地址: ${serviceUrl}`);
+  }
+  console.log(`📡 API地址: ${serviceUrl}/api/recommendations`);
+  console.log(`💚 健康检查: ${serviceUrl}/health`);
+  console.log(`📋 城市列表: ${serviceUrl}/api/cities`);
+  console.log(`🎫 景点列表: ${serviceUrl}/api/attractions`);
+  console.log(`🔧 信任信号更新: POST ${serviceUrl}/api/admin/update-trust-signals`);
   
   // 检查环境变量
   if (!process.env.OTA_PID && !process.env.CTRIP_PID) {
@@ -776,7 +783,7 @@ app.listen(PORT, () => {
   }
   
   // 显示定时任务状态
-  if (process.env.NODE_ENV === 'production' || !process.env.NODE_ENV) {
+  if (isProduction) {
     console.log('📅 定时任务: 每天凌晨2点更新信任信号（生产环境）');
   } else {
     console.log('📅 定时任务: 每5分钟更新信任信号（开发环境）');

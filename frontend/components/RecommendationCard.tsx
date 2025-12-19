@@ -16,10 +16,9 @@ interface Recommendation {
   weather: string
   suitable_days: string
   trust_signals: {
-    student_count: number
+    view_count_7d: number
     click_count_7d: number
     is_popular: boolean
-    is_student_favorite?: boolean
   }
   cover_image: string
   cta_text: string
