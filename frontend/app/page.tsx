@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import RecommendationCard from '@/components/RecommendationCard'
 import { fetchRecommendations, type Recommendation } from '@/lib/api'
+import { provincesAndCities, getAllProvinces, getCitiesByProvince } from '@/lib/cities'
 
 export default function Home() {
   const [weekRecommendations, setWeekRecommendations] = useState<Recommendation[]>([])
@@ -12,9 +13,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [origin, setOrigin] = useState<string>('北京') // 默认出发地
   const [showOriginSelector, setShowOriginSelector] = useState(false)
-
-  // 常用出发城市列表
-  const originCities = ['北京', '上海', '广州', '深圳', '杭州', '南京', '成都', '武汉', '西安', '重庆']
+  const [selectedProvince, setSelectedProvince] = useState<string>('北京') // 选中的省份
+  const [showCityList, setShowCityList] = useState(false) // 是否显示城市列表
 
   useEffect(() => {
     fetchAllRecommendations()
@@ -58,37 +58,85 @@ export default function Home() {
               🎒 学生旅游推荐
             </h1>
             <div className="flex items-center gap-3">
-              {/* 出发地选择器 */}
+              {/* 出发地选择器 - 两级选择（先选省后选市） */}
               <div className="relative">
                 <button
-                  onClick={() => setShowOriginSelector(!showOriginSelector)}
+                  onClick={() => {
+                    setShowOriginSelector(!showOriginSelector)
+                    setShowCityList(false)
+                    // 根据当前城市找到对应的省份
+                    const currentProvince = provincesAndCities.find(p => 
+                      p.cities.some(c => c.name === origin)
+                    )
+                    if (currentProvince) {
+                      setSelectedProvince(currentProvince.name)
+                    }
+                  }}
                   className="text-sm sm:text-base text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors border border-gray-200 flex items-center gap-2"
                 >
                   <span>📍 出发地：{origin}</span>
                   <span className="text-xs">▼</span>
                 </button>
-                {/* 下拉菜单 */}
+                {/* 两级下拉菜单 */}
                 {showOriginSelector && (
                   <>
                     <div
                       className="fixed inset-0 z-20"
-                      onClick={() => setShowOriginSelector(false)}
+                      onClick={() => {
+                        setShowOriginSelector(false)
+                        setShowCityList(false)
+                      }}
                     />
-                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
-                      {originCities.map((city) => (
-                        <button
-                          key={city}
-                          onClick={() => {
-                            setOrigin(city)
-                            setShowOriginSelector(false)
-                          }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
-                            origin === city ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-700'
-                          }`}
-                        >
-                          {city}
-                        </button>
-                      ))}
+                    <div className="absolute right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-30 flex">
+                      {/* 省份列表 */}
+                      <div className="w-32 border-r border-gray-200 max-h-96 overflow-y-auto">
+                        <div className="p-2 bg-gray-50 border-b border-gray-200 sticky top-0">
+                          <div className="text-xs font-semibold text-gray-600">选择省份</div>
+                        </div>
+                        {provincesAndCities.map((province) => (
+                          <button
+                            key={province.name}
+                            onClick={() => {
+                              setSelectedProvince(province.name)
+                              setShowCityList(true)
+                              // 如果省份只有一个城市，直接选择
+                              if (province.cities.length === 1) {
+                                setOrigin(province.cities[0].name)
+                                setShowOriginSelector(false)
+                                setShowCityList(false)
+                              }
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                              selectedProvince === province.name ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-700'
+                            }`}
+                          >
+                            {province.name}
+                          </button>
+                        ))}
+                      </div>
+                      {/* 城市列表 */}
+                      {showCityList && (
+                        <div className="w-40 max-h-96 overflow-y-auto">
+                          <div className="p-2 bg-gray-50 border-b border-gray-200 sticky top-0">
+                            <div className="text-xs font-semibold text-gray-600">{selectedProvince}</div>
+                          </div>
+                          {getCitiesByProvince(selectedProvince).map((city) => (
+                            <button
+                              key={city.name}
+                              onClick={() => {
+                                setOrigin(city.name)
+                                setShowOriginSelector(false)
+                                setShowCityList(false)
+                              }}
+                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                                origin === city.name ? 'bg-primary-50 text-primary-600 font-semibold' : 'text-gray-700'
+                              }`}
+                            >
+                              {city.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
