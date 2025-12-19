@@ -28,21 +28,52 @@ export default function Home() {
     
     try {
       // 并行请求三个推荐列表和景点列表，传递出发地参数
-      const [weekData, monthData, popularData, attractionsData] = await Promise.all([
+      // 使用 Promise.allSettled 而不是 Promise.all，这样部分失败不会影响其他数据
+      const results = await Promise.allSettled([
         fetchRecommendations('week', origin),
         fetchRecommendations('month', origin),
         fetchRecommendations('popular', origin),
         fetchAttractions(undefined, 'student')
       ])
       
-      // 添加调试日志
-      console.log('获取到的数据:', { weekData, monthData, popularData })
-      console.log('本周推荐数量:', weekData?.length)
+      // 处理每个请求的结果
+      const weekData = results[0].status === 'fulfilled' ? results[0].value : []
+      const monthData = results[1].status === 'fulfilled' ? results[1].value : []
+      const popularData = results[2].status === 'fulfilled' ? results[2].value : []
+      const attractionsData = results[3].status === 'fulfilled' ? results[3].value : []
       
-      setWeekRecommendations(weekData || [])
-      setMonthRecommendations(monthData || [])
-      setPopularRecommendations(popularData || [])
-      setAttractions(attractionsData || [])
+      // 记录失败的请求
+      const errors = results
+        .map((result, index) => {
+          if (result.status === 'rejected') {
+            const names = ['本周推荐', '本月推荐', '学生常选', '景点列表']
+            console.error(`获取${names[index]}失败:`, result.reason)
+            return names[index]
+          }
+          return null
+        })
+        .filter(Boolean)
+      
+      if (errors.length > 0) {
+        console.warn('部分数据获取失败:', errors)
+        // 如果所有请求都失败，才显示错误
+        if (errors.length === results.length) {
+          setError('获取推荐失败，请稍后重试')
+        }
+      }
+      
+      // 添加调试日志
+      console.log('获取到的数据:', { 
+        week: weekData.length, 
+        month: monthData.length, 
+        popular: popularData.length,
+        attractions: attractionsData.length
+      })
+      
+      setWeekRecommendations(weekData)
+      setMonthRecommendations(monthData)
+      setPopularRecommendations(popularData)
+      setAttractions(attractionsData)
     } catch (error) {
       console.error('获取推荐失败:', error)
       setError('获取推荐失败，请稍后重试')

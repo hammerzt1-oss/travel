@@ -95,6 +95,11 @@ export async function fetchRecommendations(
     }
 
     const res = await fetch(`${API_URL}/api/recommendations?${params.toString()}`)
+    
+    if (!res.ok) {
+      throw new Error(`HTTP错误: ${res.status} ${res.statusText}`)
+    }
+    
     const data: ApiResponse<{ list: Recommendation[] }> = await res.json()
 
     if (data.code === 200 && data.data?.list) {
@@ -152,6 +157,11 @@ export async function fetchAttractions(
     }
 
     const res = await fetch(`${API_URL}/api/attractions?${params.toString()}`)
+    
+    if (!res.ok) {
+      throw new Error(`HTTP错误: ${res.status} ${res.statusText}`)
+    }
+    
     const data: ApiResponse<{ list: Attraction[] }> = await res.json()
 
     if (data.code === 200 && data.data?.list) {
