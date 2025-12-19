@@ -161,7 +161,7 @@ export default function DestinationDetailPage() {
               className="cta-button w-full text-left min-h-[60px] sm:min-h-[70px]"
             >
               <div>
-                <div className="font-bold text-base sm:text-lg mb-1">🏨 立即预订（携程）</div>
+                <div className="font-bold text-base sm:text-lg mb-1">🏨 寻找酒店（携程）</div>
                 <div className="text-xs sm:text-sm opacity-90">预算{destination.budget_range}内可成行</div>
               </div>
             </button>
