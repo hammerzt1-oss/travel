@@ -117,11 +117,11 @@ app.get('/api/recommendations', (req, res) => {
       filtered = destinations
         .filter(d => d.trust_signals.is_popular)
         .sort((a, b) => b.trust_signals.click_count_7d - a.trust_signals.click_count_7d);
-    } else if (type === 'student_favorite') {
-      // 学生常选
+    } else if (type === 'student_favorite' || type === 'popular') {
+      // 热门推荐：按点击量排序
       filtered = destinations
-        .filter(d => d.trust_signals.is_student_favorite)
-        .sort((a, b) => b.trust_signals.student_count - a.trust_signals.student_count);
+        .filter(d => d.trust_signals.is_popular)
+        .sort((a, b) => (b.trust_signals.click_count_7d || 0) - (a.trust_signals.click_count_7d || 0));
     }
     
     // 格式化返回数据
@@ -133,15 +133,13 @@ app.get('/api/recommendations', (req, res) => {
       }
       
       // 生成推荐标签
-      let tag = '学生推荐';
+      let tag = '推荐';
       if (type === 'week' || type === 'weekend') {
-        tag = '学生周末推荐';
+        tag = '周末推荐';
       } else if (type === 'month') {
-        tag = '学生本月推荐';
-      } else if (type === 'popular') {
+        tag = '本月推荐';
+      } else if (type === 'popular' || type === 'student_favorite') {
         tag = '热门推荐';
-      } else if (type === 'student_favorite') {
-        tag = '学生常选';
       }
       
       // 生成OTA跳转链接（后端统一生成，所有参数在后端）
@@ -168,13 +166,12 @@ app.get('/api/recommendations', (req, res) => {
       weather: '未来两天晴', // 简化，后续对接天气API
       suitable_days: dest.weekend_suitable ? '1-2天' : '3-4天',
       trust_signals: {
-        student_count: dest.trust_signals.student_count,
-        click_count_7d: dest.trust_signals.click_count_7d,
-        is_popular: dest.trust_signals.is_popular,
-        is_student_favorite: dest.trust_signals.is_student_favorite
+        view_count_7d: dest.trust_signals.click_count_7d || 0,
+        click_count_7d: dest.trust_signals.click_count_7d || 0,
+        is_popular: dest.trust_signals.is_popular || false
       },
       cover_image: dest.cover_image,
-        cta_text: '查看学生最低价',
+        cta_text: '立即预订', // 成人票，官方直订
         cta_links: cta_links  // 添加OTA链接
       };
     });
@@ -479,7 +476,7 @@ function generateOTALinks(destination, origin = '北京') {
   const OTA_PID = process.env.OTA_PID || process.env.CTRIP_PID || '284116645';
   const ALLIANCE_ID = process.env.ALLIANCE_ID || '7463534';
   const OUID = process.env.OUID || 'kfptpcljzh';
-  const utm_source = 'travel_student';
+  const utm_source = 'travel_recommend';
   
   // ⚠️ 重要：确保origin有值，默认为"北京"
   // 🔥 关键：使用传入的 origin 参数，不要固定为"北京"
@@ -632,10 +629,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 景点列表API（学生向）- 必须在404处理之前
+// 景点列表API - 必须在404处理之前
 app.get('/api/attractions', (req, res) => {
   try {
-    const { city_name, city, type = 'student' } = req.query;
+    const { city_name, city, type = 'popular' } = req.query;
     const attractions = getAttractions();
     
     // 根据城市筛选
@@ -646,15 +643,16 @@ app.get('/api/attractions', (req, res) => {
       filtered = attractions.filter(a => a.city === city || a.city_name === city);
     }
     
-    // 学生向筛选：只返回学生友好的景点
-    if (type === 'student') {
-      filtered = filtered.filter(a => a.student_friendly && a.student_ticket);
+    // 热门筛选：只返回热门景点（成人票）
+    // ⚠️ 重要：本产品仅展示成人可购、可返佣的产品
+    if (type === 'popular' || type === 'student') {
+      filtered = filtered.filter(a => a.trust_signals?.is_popular || (a.trust_signals?.click_count_7d || 0) > 500);
     }
     
-    // 按学生选择量排序
+    // 按浏览量排序（成人票）
     filtered.sort((a, b) => {
-      const aCount = a.trust_signals?.student_count || 0;
-      const bCount = b.trust_signals?.student_count || 0;
+      const aCount = a.trust_signals?.click_count_7d || 0;
+      const bCount = b.trust_signals?.click_count_7d || 0;
       return bCount - aCount;
     });
     
@@ -679,14 +677,17 @@ app.get('/api/attractions', (req, res) => {
       city: attraction.city_name || attraction.city,
       name: attraction.name,
       category: attraction.category,
-      student_ticket: attraction.student_ticket,
-      price_hint: attraction.price_hint,
-      primary_reason: attraction.primary_reason,
+      ticket_available: true, // 所有景点都支持成人票
+      price_hint: attraction.price_hint.replace(/学生票|学生/g, '官方').replace(/学生优惠/g, '官方优惠').replace(/免费/g, '官方价格'),
+      primary_reason: attraction.primary_reason.replace(/学生票|学生/g, '官方').replace(/学生优惠/g, '官方优惠').replace(/学生必去/g, '热门景点'),
       suitable_days: attraction.suitable_days,
       transport: attraction.transport,
       photo_friendly: attraction.photo_friendly,
-      trust_signals: attraction.trust_signals || {},
-      cta_text: '查看学生票',
+      trust_signals: {
+        view_count_7d: attraction.trust_signals?.click_count_7d || 0,
+        click_count_7d: attraction.trust_signals?.click_count_7d || 0
+      },
+      cta_text: '立即预订', // 成人票，官方直订
       cta_link: generateAttractionOtaUrl(attraction.id)
     }));
     

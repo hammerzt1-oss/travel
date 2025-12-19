@@ -128,9 +128,9 @@ export default function RecommendationCard({ recommendation, origin = '北京' }
           {recommendation.trust_signals.is_popular ? (
             // 主推卡：显示点击最多
             <span>🔥 最近7天点击最多</span>
-          ) : recommendation.trust_signals.student_count > 0 ? (
-            // 普通卡：显示学生选择数
-            <span>✅ 已被{recommendation.trust_signals.student_count}名学生选择</span>
+          ) : recommendation.trust_signals.click_count_7d > 0 ? (
+            // 普通卡：显示点击量
+            <span>🔥 最近7天 {recommendation.trust_signals.click_count_7d} 次浏览</span>
           ) : null}
         </div>
 

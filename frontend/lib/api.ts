@@ -16,10 +16,9 @@ export interface Recommendation {
   weather: string
   suitable_days: string
   trust_signals: {
-    student_count: number
+    view_count_7d: number
     click_count_7d: number
     is_popular: boolean
-    is_student_favorite?: boolean
   }
   cover_image: string
   cta_text: string
@@ -39,10 +38,9 @@ export interface DestinationDetail {
   budget_range: string
   cover_image?: string // 封面图片路径（可选）
   trust_signals: {
-    student_count: number
+    view_count_7d: number
     click_count_7d: number
     is_popular: boolean
-    is_student_favorite?: boolean
   }
   cta_links: {
     hotel: string
@@ -60,15 +58,14 @@ export interface Attraction {
   city: string
   name: string
   category: string
-  student_ticket: boolean
+  ticket_available: boolean
   price_hint: string
   primary_reason: string
   suitable_days: string
   transport: string
   photo_friendly: boolean
   trust_signals: {
-    student_count: number
-    is_student_favorite?: boolean
+    view_count_7d: number
     click_count_7d?: number
   }
   cta_text: string
@@ -144,11 +141,11 @@ export async function fetchDestinationDetail(
 }
 
 /**
- * 获取景点列表（学生向）
+ * 获取景点列表
  */
 export async function fetchAttractions(
   city_name?: string,
-  type: 'student' | 'all' = 'student'
+  type: 'popular' | 'all' = 'popular'
 ): Promise<Attraction[]> {
   try {
     const params = new URLSearchParams({ type })

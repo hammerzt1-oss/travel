@@ -33,7 +33,7 @@ export default function Home() {
         fetchRecommendations('week', origin),
         fetchRecommendations('month', origin),
         fetchRecommendations('popular', origin),
-        fetchAttractions(undefined, 'student')
+        fetchAttractions(undefined, 'popular')
       ])
       
       // 处理每个请求的结果
@@ -46,7 +46,7 @@ export default function Home() {
       const errors = results
         .map((result, index) => {
           if (result.status === 'rejected') {
-            const names = ['本周推荐', '本月推荐', '学生常选', '景点列表']
+            const names = ['本周推荐', '本月推荐', '热门推荐', '景点列表']
             console.error(`获取${names[index]}失败:`, result.reason)
             return names[index]
           }
@@ -90,7 +90,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl sm:text-2xl font-bold text-primary-600">
-              🎒 学生旅游推荐
+              🎒 旅游推荐
             </h1>
             <div className="flex items-center gap-3">
               {/* 出发地选择器 - 两级选择（先选省后选市） */}
@@ -257,10 +257,10 @@ export default function Home() {
           )}
         </section>
 
-        {/* 学生常选 */}
+        {/* 热门推荐 */}
         <section className="mb-8 sm:mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
-            【学生常选】
+            【热门推荐】
           </h2>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -276,15 +276,15 @@ export default function Home() {
             </div>
           ) : (
             <div className="text-center py-12 text-gray-500">
-              <p>暂无学生常选推荐</p>
+              <p>暂无热门推荐</p>
             </div>
           )}
         </section>
 
-        {/* 学生必去景点 */}
+        {/* 热门景点 */}
         <section className="mb-8 sm:mb-12">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
-            🎫 学生必去景点（当天可玩）
+            🎫 热门景点（当天可玩）
           </h2>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

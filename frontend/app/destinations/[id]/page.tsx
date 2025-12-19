@@ -129,14 +129,11 @@ export default function DestinationDetailPage() {
         {/* 信任信号 */}
         <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 mb-4 sm:mb-6">
           <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs sm:text-sm text-gray-600">
-            {destination.trust_signals.student_count > 0 && (
-              <span>✅ 已被{destination.trust_signals.student_count}名学生选择</span>
+            {destination.trust_signals.click_count_7d > 0 && (
+              <span>🔥 最近7天 {destination.trust_signals.click_count_7d} 次浏览</span>
             )}
             {destination.trust_signals.is_popular && (
-              <span>🔥 最近7天点击最多</span>
-            )}
-            {destination.trust_signals.is_student_favorite && (
-              <span>🎓 学生党常选</span>
+              <span>⭐ 热门推荐</span>
             )}
           </div>
         </div>
@@ -164,7 +161,7 @@ export default function DestinationDetailPage() {
               className="cta-button w-full text-left min-h-[60px] sm:min-h-[70px]"
             >
               <div>
-                <div className="font-bold text-base sm:text-lg mb-1">🏨 查看学生最低价（携程）</div>
+                <div className="font-bold text-base sm:text-lg mb-1">🏨 立即预订（携程）</div>
                 <div className="text-xs sm:text-sm opacity-90">预算{destination.budget_range}内可成行</div>
               </div>
             </button>
@@ -176,7 +173,7 @@ export default function DestinationDetailPage() {
             >
               <div>
                 <div className="font-bold text-base sm:text-lg mb-1">🚄 现在去订（高铁/机票）</div>
-                <div className="text-xs sm:text-sm opacity-90">学生专享价</div>
+                <div className="text-xs sm:text-sm opacity-90">官方直订</div>
               </div>
             </button>
 
@@ -187,7 +184,7 @@ export default function DestinationDetailPage() {
             >
               <div>
                 <div className="font-bold text-base sm:text-lg mb-1">🎫 查看优惠套餐</div>
-                <div className="text-xs sm:text-sm opacity-90">学生专享价</div>
+                <div className="text-xs sm:text-sm opacity-90">官方直订</div>
               </div>
             </button>
           </div>
