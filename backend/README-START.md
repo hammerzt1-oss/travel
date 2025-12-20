@@ -74,3 +74,4 @@ curl http://localhost:3001/api/recommendations?type=week
 ✅ 所有"学生"相关字段已清理
 ✅ 缓存控制已添加
 
+

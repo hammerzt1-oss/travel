@@ -21,29 +21,33 @@ function formatSoldCount(count: number): string {
   return count.toString()
 }
 
-// 计算稀缺程度
+// 计算受欢迎程度（合规表述）
 function getScarcityLevel(soldCount: number): {
   level: 'high' | 'medium' | 'low'
   text: string
   color: string
+  hint: string
 } {
   if (soldCount >= 200000) {
     return {
       level: 'high',
-      text: '库存告急',
-      color: 'text-red-600'
+      text: '🔥 热门选择',
+      color: 'text-red-600',
+      hint: '可使用的酒店库存越来越少'
     }
   } else if (soldCount >= 100000) {
     return {
       level: 'medium',
-      text: '库存紧张',
-      color: 'text-orange-600'
+      text: '最近使用人数较多',
+      color: 'text-orange-600',
+      hint: '可使用的酒店库存越来越少'
     }
   }
   return {
     level: 'low',
-    text: '热销中',
-    color: 'text-primary-600'
+    text: '⏰ 当前优惠',
+    color: 'text-primary-600',
+    hint: '⏰ 近期有效'
   }
 }
 
@@ -102,7 +106,7 @@ export default function HotelCouponCard({
           {description}
         </p>
 
-        {/* 已售数量和稀缺提示 */}
+        {/* 已售数量和受欢迎程度提示 */}
         <div className="mb-4 space-y-2">
           {soldCount > 0 && (
             <div className="flex items-center justify-between">
@@ -117,7 +121,14 @@ export default function HotelCouponCard({
             </div>
           )}
           
-          {/* 稀缺进度条（视觉化稀缺感） */}
+          {/* 提示文案（合规表述） */}
+          {soldCount > 0 && scarcity.hint && (
+            <div className="text-xs text-gray-500 italic">
+              {scarcity.hint}
+            </div>
+          )}
+          
+          {/* 受欢迎程度进度条（视觉化受欢迎程度） */}
           {soldCount > 0 && (
             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
               <div 
