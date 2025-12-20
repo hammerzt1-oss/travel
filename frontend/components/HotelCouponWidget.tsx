@@ -1,19 +1,20 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+
 export default function HotelCouponWidget() {
-  // 酒店优惠券链接（使用最低价的链接）
-  const couponLink = "https://t.ctrip.cn/AlqONib"
+  const router = useRouter()
   const minPrice = 69
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
-    // 在新窗口打开链接，确保联盟追踪有效
-    window.open(couponLink, '_blank', 'noopener,noreferrer')
+    // 跳转到酒店优惠券详情页
+    router.push('/hotel-coupons')
   }
 
   return (
     <div className="mb-4 sm:mb-6">
-      {/* 小控件入口 - 第一行，点击跳转 */}
+      {/* 小控件入口 - 第一行，点击跳转到详情页 */}
       <div 
         onClick={handleClick}
         className="bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg p-3 sm:p-4 cursor-pointer hover:from-primary-600 hover:to-primary-700 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]"
