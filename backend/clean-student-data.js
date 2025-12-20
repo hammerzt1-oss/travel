@@ -21,6 +21,7 @@ destinations.forEach(d => {
       reason.replace(/学生友好/g, '安全可靠')
            .replace(/学生票多/g, '门票丰富')
            .replace(/学生/g, '')
+           .replace(/安全可靠，安全可靠/g, '安全可靠') // 修复重复
     );
   }
 });
