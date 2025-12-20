@@ -106,46 +106,28 @@ export default function HotelCouponCard({
           {description}
         </p>
 
-        {/* 已售数量和受欢迎程度提示 */}
-        <div className="mb-4 space-y-2">
-          {soldCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm text-gray-600">
+        {/* 已售数量和受欢迎程度提示 - 同一行显示 */}
+        {soldCount > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
                 已售 {formatSoldCount(soldCount)}
               </span>
-              <span className={`text-xs sm:text-sm font-semibold ${scarcity.color} ${
+              <span className="text-gray-400">·</span>
+              <span className={`text-xs sm:text-sm font-semibold ${scarcity.color} whitespace-nowrap ${
                 scarcity.level === 'high' && isUrgent ? 'animate-pulse' : ''
               }`}>
                 {scarcity.text}
               </span>
             </div>
-          )}
-          
-          {/* 提示文案（合规表述） */}
-          {soldCount > 0 && scarcity.hint && (
-            <div className="text-xs text-gray-500 italic">
-              {scarcity.hint}
-            </div>
-          )}
-          
-          {/* 受欢迎程度进度条（视觉化受欢迎程度） */}
-          {soldCount > 0 && (
-            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  scarcity.level === 'high' 
-                    ? 'bg-gradient-to-r from-red-500 to-red-600' 
-                    : scarcity.level === 'medium'
-                    ? 'bg-gradient-to-r from-orange-500 to-orange-600'
-                    : 'bg-gradient-to-r from-primary-500 to-primary-600'
-                }`}
-                style={{
-                  width: `${Math.min((soldCount / 300000) * 100, 95)}%`
-                }}
-              />
-            </div>
-          )}
-        </div>
+            {/* 提示文案（合规表述） */}
+            {scarcity.hint && (
+              <div className="text-xs text-gray-500 mt-1.5">
+                {scarcity.hint}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* CTA按钮 */}
         <button
