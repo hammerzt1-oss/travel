@@ -8,32 +8,37 @@ export default function HotelCouponsPage() {
       price: 69,
       title: "全国惠选酒店通用券",
       description: "覆盖全国多城市 · 性价比之选",
-      link: "https://t.ctrip.cn/AlqONib"
+      link: "https://t.ctrip.cn/AlqONib",
+      soldCount: 66849
     },
     {
       price: 99,
       title: "全国经济酒店通用券",
       description: "适合出差 / 预算旅行",
-      link: "https://t.ctrip.cn/AKW7JvR"
+      link: "https://t.ctrip.cn/AKW7JvR",
+      soldCount: 568756
     },
     {
       price: 129,
       title: "全国悦享酒店通用券",
       description: "品质升级 · 舒适入住",
       link: "https://t.ctrip.cn/tdl7mS5",
-      recommended: true
+      recommended: true,
+      soldCount: 107470
     },
     {
       price: 159,
       title: "全国舒适酒店通用券",
       description: "舒适体验 · 商务首选",
-      link: "https://t.ctrip.cn/jwrPXEY"
+      link: "https://t.ctrip.cn/jwrPXEY",
+      soldCount: 171279
     },
     {
       price: 199,
       title: "全国优质酒店通用券",
       description: "高端品质 · 尊享体验",
-      link: "https://t.ctrip.cn/Bl4YADl"
+      link: "https://t.ctrip.cn/Bl4YADl",
+      soldCount: 262260
     }
   ]
 
@@ -59,6 +64,7 @@ export default function HotelCouponsPage() {
               title={coupon.title}
               description={coupon.description}
               link={coupon.link}
+              soldCount={coupon.soldCount}
               recommended={coupon.recommended}
             />
           ))}
