@@ -36,6 +36,9 @@ type CharacterInstance = {
   animations: Set<string>
   animation: string | null
   artScale: number
+  // Laya's armature origin is not the gameplay collider origin. Keep the
+  // authored local bounds so every pose is anchored by its visible feet.
+  bounds: { x: number; y: number; width: number; height: number } | null
 }
 
 type PositionSample = {
@@ -66,6 +69,7 @@ const PDZZ_VIEWPORT_HEIGHT = 1670
 const CHARACTER_INTERPOLATION_DELAY_MS = 70
 const CHARACTER_MAX_EXTRAPOLATION_MS = 80
 const CHARACTER_MAX_HISTORY = 8
+const CHARACTER_ART_HEIGHT = 60
 const animationForState: Record<PlayerSnapshot['animationState'], string> = {
   idle: 'idle',
   run: 'run',
@@ -275,8 +279,6 @@ export class LayaCharacterRenderer {
     const worldPosition = this.interpolatedPosition(track, now)
     const displayPlayer = { ...player, x: worldPosition.x, y: worldPosition.y }
     const position = scene.playerScreenPosition(displayPlayer, this.host.clientWidth, this.host.clientHeight)
-    instance.skeleton.x = position.x
-    instance.skeleton.y = position.y
     instance.skeleton.visible = state.status !== 'BUILDING'
     instance.skeleton.alpha = player.alive || player.finished ? 1 : 0.35
     const animation = animationForState[player.animationState]
@@ -287,11 +289,21 @@ export class LayaCharacterRenderer {
         instance.animation = next
       }
     }
-    // The APK character controller is 30x60, while the Laya root is the
-    // character's foot pivot. This scale keeps that pivot exactly on the
-    // server collider's bottom edge for both rabbit and pig.
+    // The server collider is 30x60, but an imported Laya armature usually has
+    // a root at its torso (and some armatures have a large empty local box).
+    // Scale the authored visible bounds to the controller height, then move
+    // the root so the visible bounds' center/feet match the collider exactly.
     const baseScale = Math.min(position.zoom, 1) * instance.artScale
-    instance.skeleton.scale(baseScale * (player.direction < 0 ? -1 : 1), baseScale)
+    const signedScaleX = baseScale * (player.direction < 0 ? -1 : 1)
+    const bounds = instance.bounds
+    if (bounds && bounds.height > 0) {
+      instance.skeleton.x = position.x - (bounds.x + bounds.width / 2) * signedScaleX
+      instance.skeleton.y = position.y - (bounds.y + bounds.height) * baseScale
+    } else {
+      instance.skeleton.x = position.x
+      instance.skeleton.y = position.y
+    }
+    instance.skeleton.scale(signedScaleX, baseScale)
   }
 
   private renderFrame = (now: number) => {
@@ -332,12 +344,22 @@ export class LayaCharacterRenderer {
       const idle = animations.has('idle') ? 'idle' : animations.values().next().value
       if (idle) skeleton.play(idle, true, true)
       const bounds = skeleton.getBounds?.()
-      const measuredScale = bounds && bounds.height > 0 ? 60 / bounds.height : null
+      const measuredScale = bounds && bounds.height > 0 ? CHARACTER_ART_HEIGHT / bounds.height : null
       const artScale = measuredScale ?? fallbackCharacterArtScale[character.avatarID] ?? 0.2
       this.runtime.stage.addChild(skeleton)
-      this.instances.set(playerId, { skeleton, animations, animation: null, artScale })
+      this.instances.set(playerId, {
+        skeleton,
+        animations,
+        animation: null,
+        artScale,
+        bounds: bounds && bounds.height > 0 ? bounds : null,
+      })
       scene.setPlayerFallbackVisible(playerId, false)
-      console.info('[pdzz] character skeleton ready', playerId, avatarId)
+      console.info('[pdzz] character skeleton ready', playerId, avatarId, {
+        bounds,
+        artScale,
+        targetHeight: CHARACTER_ART_HEIGHT,
+      })
       // Loading is asynchronous. Apply the latest snapshot immediately so a
       // short countdown or round cannot finish before the first pose appears.
       const latestState = this.latestState ?? state
