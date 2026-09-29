@@ -1,0 +1,85 @@
+{
+  "source": "pdzz/base.apk cached game assets",
+  "ui": {
+    "atlas": "/game/assets/pdzz/ui/ui.json",
+    "image": "/game/assets/pdzz/ui/ui.png",
+    "layout": "/game/assets/pdzz/ui/ui-layout.json"
+  },
+  "characters": [
+    {
+      "id": "rabbit2",
+      "image": "/game/assets/pdzz/characters/raw/rabbit2.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/rabbit2.sk"
+    },
+    {
+      "id": "pig",
+      "image": "/game/assets/pdzz/characters/raw/pig.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/pig.sk"
+    },
+    {
+      "id": "dinosaur2",
+      "image": "/game/assets/pdzz/characters/raw/dinosaur2.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/dinosaur2.sk"
+    },
+    {
+      "id": "tiger",
+      "image": "/game/assets/pdzz/characters/raw/tiger.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/tiger.sk"
+    },
+    {
+      "id": "horse",
+      "image": "/game/assets/pdzz/characters/raw/horse.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/horse.sk"
+    },
+    {
+      "id": "chicken",
+      "image": "/game/assets/pdzz/characters/raw/chicken.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/chicken.sk"
+    },
+    {
+      "id": "dog",
+      "image": "/game/assets/pdzz/characters/raw/dog.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/dog.sk"
+    },
+    {
+      "id": "sheep",
+      "image": "/game/assets/pdzz/characters/raw/sheep.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/sheep.sk"
+    },
+    {
+      "id": "bull",
+      "image": "/game/assets/pdzz/characters/raw/bull.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/bull.sk"
+    },
+    {
+      "id": "monkey",
+      "image": "/game/assets/pdzz/characters/raw/monkey.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/monkey.sk"
+    },
+    {
+      "id": "snake",
+      "image": "/game/assets/pdzz/characters/raw/snake.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/snake.sk"
+    },
+    {
+      "id": "mouse",
+      "image": "/game/assets/pdzz/characters/raw/mouse.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/mouse.sk"
+    },
+    {
+      "id": "bear",
+      "image": "/game/assets/pdzz/characters/raw/bear.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/bear.sk"
+    },
+    {
+      "id": "shark",
+      "image": "/game/assets/pdzz/characters/raw/shark.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/shark.sk"
+    },
+    {
+      "id": "honeybadger",
+      "image": "/game/assets/pdzz/characters/raw/honeybadger.png",
+      "skeleton": "/game/assets/pdzz/characters/skeletons/honeybadger.sk"
+    }
+  ]
+}

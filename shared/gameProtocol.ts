@@ -100,6 +100,9 @@ export type PlacedTrap = {
   offsetX?: number
   offsetY?: number
   visualRotation?: number
+  /** Runtime state exposed for component-specific visual states. */
+  active?: boolean
+  phase?: 'idle' | 'warning' | 'active' | 'reverting'
 }
 
 export type PlayerSnapshot = {
@@ -208,6 +211,7 @@ export type BuildState = {
   options: TrapOption[]
   pendingPlacements: PendingPlacement[]
   placedCount: number
+  placedPlayerIds: string[]
 }
 
 export type RoomPlayer = {
