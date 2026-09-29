@@ -58,6 +58,7 @@ type SimPlayer = {
   boostUntil: number
   trapCooldowns: Map<string, number>
   reverseUntil: number
+  gasExitUntil: number
   freezeUntil: number
   lowGravityUntil: number
   bot: boolean
@@ -181,6 +182,22 @@ function overlaps(
   bh: number,
 ) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
+}
+
+function circleOverlapsRect(
+  centerX: number,
+  centerY: number,
+  radius: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const closestX = clamp(centerX, x, x + width)
+  const closestY = clamp(centerY, y, y + height)
+  const dx = centerX - closestX
+  const dy = centerY - closestY
+  return dx * dx + dy * dy <= radius * radius
 }
 
 function sourceToWorld(map: NonNullable<ReturnType<typeof getPdzzMap>>, x: number, y: number) {
@@ -514,6 +531,99 @@ function trapCellRects(
   }))
 }
 
+type TrapRect = { x: number; y: number; width: number; height: number }
+
+function trapEntityCenter(trap: PlacedTrap, elapsed: number) {
+  const motion = trapMotion(trap, elapsed)
+  return {
+    x: trap.x * CELL_SIZE + (trap.width * CELL_SIZE) / 2 + motion.offsetX,
+    y: trap.y * CELL_SIZE + (trap.height * CELL_SIZE) / 2 + motion.offsetY,
+  }
+}
+
+function rotateOffset(x: number, y: number, rotation: Rotation) {
+  switch (rotation) {
+    case 90: return { x: -y, y: x }
+    case 180: return { x: -x, y: -y }
+    case 270: return { x: y, y: -x }
+    default: return { x, y }
+  }
+}
+
+function orientedRect(
+  centerX: number,
+  centerY: number,
+  width: number,
+  height: number,
+  localX: number,
+  localY: number,
+  rotation: Rotation,
+): TrapRect {
+  const offset = rotateOffset(localX, localY, rotation)
+  const rotated = rotation === 90 || rotation === 270
+    ? { width: height, height: width }
+    : { width, height }
+  return {
+    x: centerX + offset.x - rotated.width / 2,
+    y: centerY + offset.y - rotated.height / 2,
+    width: rotated.width,
+    height: rotated.height,
+  }
+}
+
+function fortuneCatTriggerRect(trap: PlacedTrap, elapsed: number) {
+  const center = trapEntityCenter(trap, elapsed)
+  return orientedRect(center.x, center.y, 2.6 * CELL_SIZE, 0.8 * CELL_SIZE, 0, 0, trap.rotation)
+}
+
+function fortuneCatHazardRect(trap: PlacedTrap, elapsed: number) {
+  const center = trapEntityCenter(trap, elapsed)
+  const definition = trapDefinition('fortunecat')
+  const localPlatformHeight = (definition?.height ?? 2) * CELL_SIZE
+  return orientedRect(center.x, center.y, 2.6 * CELL_SIZE, 0.5 * CELL_SIZE, 0, 0.2 * localPlatformHeight, trap.rotation)
+}
+
+function bounceIn(value: number) {
+  const t = clamp(value, 0, 1)
+  const bounceOut = (progress: number) => {
+    if (progress < 1 / 2.75) return 7.5625 * progress * progress
+    if (progress < 2 / 2.75) {
+      const adjusted = progress - 1.5 / 2.75
+      return 7.5625 * adjusted * adjusted + 0.75
+    }
+    if (progress < 2.5 / 2.75) {
+      const adjusted = progress - 2.25 / 2.75
+      return 7.5625 * adjusted * adjusted + 0.9375
+    }
+    const adjusted = progress - 2.625 / 2.75
+    return 7.5625 * adjusted * adjusted + 0.984375
+  }
+  return 1 - bounceOut(1 - t)
+}
+
+function cactusProgress(age: number) {
+  if (age < 0.3 || age >= 2.1) return 0
+  if (age < 0.8) return bounceIn((age - 0.3) / 0.5)
+  if (age < 1.6) return 1
+  return bounceIn((2.1 - age) / 0.5)
+}
+
+function cactusHazardRect(trap: PlacedTrap, elapsed: number, age: number) {
+  const progress = cactusProgress(age)
+  if (progress <= 0.5) return null
+  const center = trapEntityCenter(trap, elapsed)
+  const epsilon = 0.001
+  return orientedRect(
+    center.x,
+    center.y,
+    CELL_SIZE - epsilon,
+    CELL_SIZE * progress,
+    0,
+    CELL_SIZE / 2 - (CELL_SIZE * progress) / 2,
+    trap.rotation,
+  )
+}
+
 function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
   const definition = trapDefinition(trap.trapId)
   if (!definition) return []
@@ -522,9 +632,15 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
     const x = cell.x
     const y = cell.y
     switch (trap.trapId) {
+      case 'triggerspikes':
+        switch (trap.rotation) {
+          case 90: return { ...cell, x: x - 20, y: y + 2.5, width: 20, height: 45 }
+          case 180: return { ...cell, x: x + 2.5, y: y + 50, width: 45, height: 20 }
+          case 270: return { ...cell, x: x + 50, y: y + 2.5, width: 20, height: 45 }
+          default: return { ...cell, x: x + 2.5, y: y - 20, width: 45, height: 20 }
+        }
       case 'spike':
       case 'spike3x1':
-      case 'triggerspikes':
         switch (trap.rotation) {
           case 90: return { ...cell, x: x + 35, y: y + 5, width: 15, height: 40 }
           case 180: return { ...cell, x: x + 5, y, width: 40, height: 15 }
@@ -533,15 +649,23 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
         }
       case 'ice':
       case 'ice3x1':
-      case 'mud':
         switch (trap.rotation) {
           case 90: return { ...cell, x: x + 35, y, width: 15, height: 50 }
           case 180: return { ...cell, x, y, width: 50, height: 15 }
           case 270: return { ...cell, x, y, width: 15, height: 50 }
           default: return { ...cell, x, y: y + 35, width: 50, height: 15 }
         }
+      case 'mud':
+        switch (trap.rotation) {
+          case 90: return { ...cell, x: x + 35, y: y + 5, width: 15, height: 40 }
+          case 180: return { ...cell, x: x + 5, y, width: 40, height: 15 }
+          case 270: return { ...cell, x, y: y + 5, width: 15, height: 40 }
+          default: return { ...cell, x: x + 5, y: y + 35, width: 40, height: 15 }
+        }
       case 'spikeball':
         return { ...cell, x: x + 7.5, y: y + 7.5, width: 35, height: 35 }
+      case 'gas':
+        return { ...cell, x: x - 0.5 * CELL_SIZE, y: y - 0.5 * CELL_SIZE, width: 2 * CELL_SIZE, height: 2 * CELL_SIZE }
       case 'linearsaw':
       case 'spinningsaw':
       case 'swingsaw':
@@ -551,6 +675,11 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
     }
   })
   return rects
+}
+
+function trapActivationRect(trap: PlacedTrap, elapsed: number) {
+  if (trap.trapId === 'fortunecat') return fortuneCatTriggerRect(trap, elapsed)
+  return null
 }
 
 function trapBottomCells(definition: TrapDefinition, rotation: Rotation) {
@@ -635,8 +764,8 @@ export function isLegalTrapPlacement(
       const cellBottom = worldY + (cell.y + 1) * CELL_SIZE
       return level.platforms.some((platform) =>
         Math.abs(cellBottom - platform.y) <= CELL_SIZE * 0.3 &&
-        cellX + CELL_SIZE > platform.x - 4 &&
-        cellX < platform.x + platform.width + 4,
+        cellX + CELL_SIZE > platform.x &&
+        cellX < platform.x + platform.width,
       )
     })
     if (!hasSupport) return false
@@ -699,6 +828,7 @@ export class GameSimulation {
   private switchOccupants = new Set<string>()
   private crumbleStartedAt = new Map<string, number>()
   private finishTriggerOccupants = new Set<string>()
+  private trapActivationAt = new Map<string, number>()
   private readonly aiPaths = new Map<string, Array<{ x: number; y: number; jump: boolean }>>()
 
   constructor(
@@ -761,6 +891,7 @@ export class GameSimulation {
             boostUntil: 0,
             trapCooldowns: new Map(),
             reverseUntil: 0,
+            gasExitUntil: 0,
             freezeUntil: 0,
             lowGravityUntil: 0,
           } satisfies SimPlayer,
@@ -799,6 +930,7 @@ export class GameSimulation {
     if (this.isComplete()) return
     this.elapsed = Math.min(PLAY_DURATION_SECONDS, this.elapsed + dt)
     this.updateSwitches()
+    this.updateTrapStates()
     this.updateProjectiles(dt)
     for (const player of this.players.values()) {
       if (player.bot) this.updateBotInput(player)
@@ -829,7 +961,7 @@ export class GameSimulation {
     const firstFinisher = ordered.find((player) => player.finished) ?? null
     // League single-player (_k.getIsDoubleScoreRound) doubles only the final
     // round's base score. This is independent of the trap bonus.
-    const doubleBaseScore = this.round === 3
+    const doubleBaseScore = this.round === 5
     const entries = ordered.map((player, index) => {
       const baseBeforeMultiplier =
         !player.finished
@@ -867,7 +999,7 @@ export class GameSimulation {
       round: this.round,
       winnerId: firstFinisher?.id ?? null,
       doubleBaseScore,
-      final: this.round === 3,
+      final: this.round === 5,
       entries,
     }
   }
@@ -884,6 +1016,8 @@ export class GameSimulation {
         traps: this.placedTraps.map((trap) => ({
           ...trap,
           ...trapMotion(trap, this.elapsed),
+          active: this.isTrapHazardActive(trap),
+          phase: this.trapPhase(trap),
         })),
       },
       startedAt: this.elapsed > 0 ? Date.now() - Math.round(this.elapsed * 1000) : null,
@@ -909,6 +1043,21 @@ export class GameSimulation {
 
     const previousX = player.x
     const previousY = player.y
+    // Mud is a grounded surface effect in the APK. It changes horizontal
+    // speed, jump impulse, and wall-slide gravity only while the foot is on
+    // the mud trigger, not merely while the body overlaps its cell.
+    player.surfaceMaterial = player.iceUntil > this.elapsed ? 'ice' : 'normal'
+    for (const trap of this.placedTraps) {
+      if (trap.trapId !== 'mud') continue
+      const mudRect = trapTriggerRects(trap, this.elapsed)[0]
+      if (mudRect && player.onGround && overlaps(
+        player.x + 4, player.y + PLAYER_HEIGHT - 4, PLAYER_WIDTH - 8, 8,
+        mudRect.x, mudRect.y, mudRect.width, mudRect.height,
+      )) {
+        player.surfaceMaterial = 'mud'
+        break
+      }
+    }
     const inputHorizontal = (player.input.right ? 1 : 0) - (player.input.left ? 1 : 0)
     const horizontal = player.reverseUntil > this.elapsed ? -inputHorizontal : inputHorizontal
     const previousExtraHorizontalAirSpeed = player.extraHorizontalAirSpeed
@@ -930,8 +1079,7 @@ export class GameSimulation {
     const wallClinging = !wasGrounded && player.onWall && player.fallingTime > 0.085
     if (
       wallClinging &&
-      ((player.wallDirection === -1 && player.extraHorizontalAirSpeed < 0) ||
-        (player.wallDirection === 1 && player.extraHorizontalAirSpeed > 0))
+      player.extraHorizontalAirSpeed * player.wallDirection < 0
     ) {
       player.extraHorizontalAirSpeed = 0
     }
@@ -1118,8 +1266,36 @@ export class GameSimulation {
       const definition = trapDefinition(trap.trapId)
       if (!definition) continue
       if (this.isTrapDisabled(trap)) continue
-      const rects = trapTriggerRects(trap, this.elapsed)
+      const rects = this.trapHazardRects(trap)
       if (['cannon', 'crossbow', 'ballooncannon', 'lasershooter'].includes(trap.trapId)) continue
+      if (trap.trapId === 'gas') {
+        const gasCell = trapCellRects(trap, this.elapsed)[0]
+        if (gasCell) {
+          const inner = {
+            x: gasCell.x - CELL_SIZE * 0.25,
+            y: gasCell.y - CELL_SIZE * 0.25,
+            width: CELL_SIZE * 1.5,
+            height: CELL_SIZE * 1.5,
+          }
+          const outer = {
+            x: gasCell.x - CELL_SIZE * 0.5,
+            y: gasCell.y - CELL_SIZE * 0.5,
+            width: CELL_SIZE * 2,
+            height: CELL_SIZE * 2,
+          }
+          const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+          if (overlaps(body.x, body.y, body.width, body.height, inner.x, inner.y, inner.width, inner.height)) {
+            player.reverseUntil = this.elapsed + 0.1
+            player.gasExitUntil = this.elapsed + 1.5
+          } else if (overlaps(body.x, body.y, body.width, body.height, outer.x, outer.y, outer.width, outer.height)) {
+            player.reverseUntil = Math.max(player.reverseUntil, player.gasExitUntil)
+          }
+        }
+        continue
+      }
+      if (trap.trapId === 'fortunecat' || trap.trapId === 'triggerhazard' || trap.trapId === 'triggerspikes') {
+        if (!this.isTrapHazardActive(trap)) continue
+      }
       for (const rect of rects) {
         const touchingTop =
           player.y + PLAYER_HEIGHT >= rect.y &&
@@ -1244,11 +1420,13 @@ export class GameSimulation {
       if (previousX + PLAYER_WIDTH <= platform.x) {
         player.x = platform.x - PLAYER_WIDTH
         player.onWall = !player.onGround
-        player.wallDirection = -1
+        // wallDirection is the impulse direction away from the wall. Keep
+        // this convention identical to moveCharacter's raycast result.
+        player.wallDirection = 1
       } else if (previousX >= platform.x + platform.width) {
         player.x = platform.x + platform.width
         player.onWall = !player.onGround
-        player.wallDirection = 1
+        player.wallDirection = -1
       } else if (player.y + PLAYER_HEIGHT > platform.y + 4) {
         player.y = platform.y + platform.height
         player.velocityY = Math.max(0, player.velocityY)
@@ -1307,8 +1485,8 @@ export class GameSimulation {
         player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.55)
         return
       case 'slow':
-        player.slowUntil = this.elapsed + 1.1
-        player.velocityX *= 0.35
+        player.slowUntil = this.elapsed + 0.2
+        if (player.surfaceMaterial !== 'mud') player.velocityX *= 0.35
         return
       case 'teleport':
         if (trap.trapId === 'portal') {
@@ -1354,7 +1532,7 @@ export class GameSimulation {
         return
       }
       case 'reverse':
-        if (trap.trapId === 'onoffswitch' || trap.trapId === 'pressureswitch') return
+        if (trap.trapId === 'onoffswitch' || trap.trapId === 'pressureswitch' || trap.trapId === 'gas') return
         player.reverseUntil = this.elapsed + 2
         player.trapCooldowns.set(trap.instanceId, this.elapsed + 2)
         return
@@ -1402,6 +1580,93 @@ export class GameSimulation {
       }
       if (occupied) this.switchOccupants.add(occupantKey)
       else this.switchOccupants.delete(occupantKey)
+    }
+  }
+
+  private isTrapHazardActive(trap: PlacedTrap) {
+    const started = this.trapActivationAt.get(trap.instanceId)
+    if (started === undefined) return false
+    const age = this.elapsed - started
+    if (trap.trapId === 'triggerhazard') return cactusProgress(age) > 0.5
+    if (trap.trapId === 'fortunecat') return age >= 0.8 && age < 1.8
+    if (trap.trapId === 'triggerspikes') return age >= 0.55 && age < 3.55
+    return false
+  }
+
+  private trapHazardRects(trap: PlacedTrap): TrapRect[] {
+    if (trap.trapId === 'fortunecat') {
+      return [fortuneCatHazardRect(trap, this.elapsed)]
+    }
+    if (trap.trapId === 'triggerhazard') {
+      const started = this.trapActivationAt.get(trap.instanceId)
+      if (started === undefined) return []
+      const rect = cactusHazardRect(trap, this.elapsed, this.elapsed - started)
+      return rect ? [rect] : []
+    }
+    return trapTriggerRects(trap, this.elapsed)
+  }
+
+  private trapPhase(trap: PlacedTrap): PlacedTrap['phase'] {
+    const started = this.trapActivationAt.get(trap.instanceId)
+    if (started === undefined) return 'idle'
+    const age = this.elapsed - started
+    if (trap.trapId === 'triggerhazard') {
+      if (age < 0.8) return 'warning'
+      if (age < 1.6) return 'active'
+      return 'reverting'
+    }
+    if (trap.trapId === 'fortunecat') return age < 0.8 ? 'warning' : 'active'
+    if (trap.trapId === 'triggerspikes') {
+      if (age < 0.55) return 'warning'
+      if (age < 3.55) return 'active'
+      return 'reverting'
+    }
+    return 'idle'
+  }
+
+  private updateTrapStates() {
+    for (const trap of this.placedTraps) {
+      if (!['fortunecat', 'triggerhazard', 'triggerspikes'].includes(trap.trapId)) continue
+      const started = this.trapActivationAt.get(trap.instanceId)
+      if (started !== undefined) {
+        const lifetime = trap.trapId === 'triggerspikes' ? 3.6 : trap.trapId === 'fortunecat' ? 1.8 : 2.1
+        if (this.elapsed - started >= lifetime) this.trapActivationAt.delete(trap.instanceId)
+        continue
+      }
+      const cells = trapCellRects(trap, this.elapsed)
+      const cell = cells[0]
+      if (!cell) continue
+      const shouldActivate = Array.from(this.players.values()).some((player) => {
+        if (!player.alive || player.finished) return false
+        const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+        if (trap.trapId === 'fortunecat') {
+          const trigger = trapActivationRect(trap, this.elapsed)
+          return Boolean(trigger && overlaps(body.x, body.y, body.width, body.height, trigger.x, trigger.y, trigger.width, trigger.height))
+        }
+        if (trap.trapId === 'triggerhazard') {
+          return circleOverlapsRect(
+            cell.x + CELL_SIZE / 2,
+            cell.y + CELL_SIZE / 2,
+            CELL_SIZE / 2,
+            body.x,
+            body.y,
+            body.width,
+            body.height,
+          )
+        }
+        // The APK triggers spring spikes from the matching collision face.
+        switch (trap.rotation) {
+          case 90:
+            return body.x <= cell.x + CELL_SIZE + 2 && body.x >= cell.x + CELL_SIZE - 8 && body.y + body.height > cell.y && body.y < cell.y + trap.height * CELL_SIZE
+          case 180:
+            return body.y <= cell.y + CELL_SIZE + 2 && body.y >= cell.y + CELL_SIZE - 8 && body.x + body.width > cell.x && body.x < cell.x + trap.width * CELL_SIZE
+          case 270:
+            return body.x + body.width >= cell.x - 2 && body.x + body.width <= cell.x + 8 && body.y + body.height > cell.y && body.y < cell.y + trap.height * CELL_SIZE
+          default:
+            return body.y + body.height >= cell.y - 2 && body.y + body.height <= cell.y + 8 && body.x + body.width > cell.x && body.x < cell.x + trap.width * CELL_SIZE
+        }
+      })
+      if (shouldActivate) this.trapActivationAt.set(trap.instanceId, this.elapsed)
     }
   }
 

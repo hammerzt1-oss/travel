@@ -24,7 +24,6 @@ import {
 } from './simulation'
 import {
   PDZZ_LEAGUE_MAP_IDS,
-  PDZZ_COMPONENTS,
   getPdzzCharacterForSlot,
 } from '../../shared/pdzzConfig'
 
@@ -38,6 +37,7 @@ type BuildInternal = {
   endsAt: number
   options: ReturnType<typeof makeOptions>
   pendingPlacements: Map<string, PendingPlacement>
+  placedPlayerIds: Set<string>
 }
 
 export type RoomEvent =
@@ -79,8 +79,7 @@ type Room = {
 const MAX_PLAYERS = 4
 const BUILD_DURATION_MS = 20_000
 const COUNTDOWN_DURATION_MS = 3_000
-const RESULT_DISPLAY_MS = 3_000
-const TOTAL_ROUNDS = 3
+const TOTAL_ROUNDS = 5
 const DISCONNECT_GRACE_MS = 30_000
 const EMPTY_ROOM_TTL_MS = 5 * 60_000
 const GAME_STATE_BROADCAST_INTERVAL_MS = 50
@@ -111,17 +110,23 @@ function isRotation(value: unknown): value is Rotation {
   return value === 0 || value === 90 || value === 180 || value === 270
 }
 
+const FIXED_LEAGUE_TRAP_IDS = [
+  'fortunecat',
+  'gas',
+  'triggerhazard',
+  'spike3x1',
+  'mud',
+  'triggerspikes',
+] as const
+
 function makeOptions() {
-  // League single-player uses the same candidate filter as the APK:
-  // available, rank-unlocked components, excluding treasure chests.
-  const candidates = TRAP_DEFINITIONS.filter((definition) => {
-    const source = PDZZ_COMPONENTS.find((component) => component.id === definition.id)
-    return Boolean(source?.available) && definition.id !== 'treasurechest' && (source?.danToUnlock ?? 0) <= 22
+  // Temporary league test pool. Keep the order stable while these six APK
+  // components are validated against the extracted runtime behavior.
+  return FIXED_LEAGUE_TRAP_IDS.map((id) => {
+    const definition = TRAP_DEFINITIONS.find((item) => item.id === id)
+    if (!definition) throw new Error(`Missing fixed league trap definition: ${id}`)
+    return { ...definition, claimedBy: null as string | null }
   })
-  return candidates
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 6)
-    .map((definition) => ({ ...definition, claimedBy: null as string | null }))
 }
 
 export class RoomManager {
@@ -174,17 +179,6 @@ export class RoomManager {
 
       if (room.status === 'BUILDING' && room.build && now >= room.build.endsAt) {
         this.finishBuild(room)
-      }
-
-      if (room.status === 'ROUND_RESULT' && room.roundResultEndsAt && now >= room.roundResultEndsAt) {
-        if (room.round >= TOTAL_ROUNDS) {
-          room.status = 'FINAL_RESULT'
-          room.roundResultEndsAt = null
-          this.broadcastRoom(room)
-        } else {
-          room.round += 1
-          this.beginBuild(room)
-        }
       }
 
       if (room.status === 'COUNTDOWN' && room.countdownEndsAt) {
@@ -460,6 +454,7 @@ export class RoomManager {
       endsAt: Date.now() + BUILD_DURATION_MS,
       options: makeOptions(),
       pendingPlacements: new Map(),
+      placedPlayerIds: new Set(),
     }
     room.simulation = new GameSimulation(
       room.round,
@@ -476,6 +471,7 @@ export class RoomManager {
     const { room, player } = context
     const build = room.build
     if (room.status !== 'BUILDING' || !build) return this.fail(socketId, 'INVALID_PHASE', '当前不是机关选择阶段')
+    if (build.placedPlayerIds.has(player.id)) return this.fail(socketId, 'ALREADY_PLACED', '本回合每位玩家只能放置一个机关')
     if (build.pendingPlacements.has(player.id)) return this.fail(socketId, 'PLACE_FIRST', '请先放置或取消当前机关')
     const option = build.options.find((item) => item.id === trapId)
     if (!option) return this.fail(socketId, 'TRAP_NOT_AVAILABLE', '这个机关不在本回合选项中')
@@ -619,6 +615,7 @@ export class RoomManager {
       placedRound: room.round,
     }
     room.placedTraps.push(placedTrap)
+    build.placedPlayerIds.add(player.id)
     this.autoConnectSwitchable(room, placedTrap)
     room.simulation?.setPlacedTraps(room.placedTraps)
     build.pendingPlacements.delete(player.id)
@@ -734,15 +731,24 @@ export class RoomManager {
     if (room.status !== 'PLAYING' || !room.simulation) return
     room.phaseEndsAt = null
     const result = room.simulation.result()
-    room.status = result.final ? 'FINAL_RESULT' : 'ROUND_RESULT'
-    room.lastResult = result
-    room.roundResultEndsAt = result.final ? null : Date.now() + RESULT_DISPLAY_MS
     for (const entry of result.entries) {
       const player = room.players.get(entry.playerId)
       if (player) player.score = entry.totalScore
     }
-    this.emit({ type: 'round_result', roomId: room.roomId, result })
-    this.broadcastRoom(room)
+    room.roundResultEndsAt = null
+    if (room.round >= TOTAL_ROUNDS) {
+      room.status = 'FINAL_RESULT'
+      const finalResult = result.final ? result : { ...result, final: true }
+      room.lastResult = finalResult
+      this.emit({ type: 'round_result', roomId: room.roomId, result: finalResult })
+      this.broadcastRoom(room)
+      return
+    }
+
+    // Intermediate rounds return directly to the build drawer. Scores are
+    // already written above, and the next build keeps all placed traps.
+    room.round += 1
+    this.beginBuild(room)
   }
 
   private recomputePendingPlacements(room: Room) {
@@ -814,6 +820,7 @@ export class RoomManager {
           options: room.build.options.map((option) => ({ ...option })),
           pendingPlacements: Array.from(room.build.pendingPlacements.values()).map((pending) => ({ ...pending })),
           placedCount: room.placedTraps.length,
+          placedPlayerIds: Array.from(room.build.placedPlayerIds),
         }
       : null
     return {

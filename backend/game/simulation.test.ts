@@ -65,6 +65,18 @@ assert.equal(isLegalTrapPlacement('spike', 2, 25, 0, [], haystack), true)
 assert.equal(isLegalTrapPlacement('spike', 2, 24, 0, [], haystack), false)
 assert.equal(isLegalTrapPlacement('spike', 0, 25, 0, [], haystack), false)
 assert.equal(isLegalTrapPlacement('spike', 2, 28, 0, [], haystack), false)
+assert.equal(isLegalTrapPlacement('spike3x1', 2, 25, 0, [], haystack), true)
+assert.equal(
+  isLegalTrapPlacement(
+    'spike3x1',
+    2,
+    25,
+    0,
+    [],
+    { ...haystack, platforms: [{ id: 'partial-support', x: 100, y: 1300, width: 100, height: 400 }] },
+  ),
+  false,
+)
 
 // Wall cling is armed by the APK's airborne fallingTime, not by a separate
 // wall-contact timer. The jump must therefore be unavailable through the
@@ -81,6 +93,7 @@ wallJumpPlayer.y = 560
 wallJumpPlayer.velocityY = 200
 wallJumpPlayer.onGround = false
 wallJumpPlayer.onWall = true
+// -1 means the contacted wall is on the right, so the jump impulse goes left.
 wallJumpPlayer.wallDirection = -1
 wallJumpSimulation.setInput('wall-jump', { left: false, right: false, jump: true })
 for (let index = 0; index < 5; index += 1) wallJumpSimulation.tick(0.017)
@@ -138,6 +151,60 @@ const selfDamageSimulation = new GameSimulation(
 )
 selfDamageSimulation.tick(1 / 30)
 assert.equal(selfDamageSimulation.snapshot('PLAYING').players[0].alive, false)
+
+const cat: PlacedTrap = {
+  instanceId: 'cat-1',
+  trapId: 'fortunecat',
+  ownerId: 'p1',
+  x: 2,
+  y: 10,
+  width: 1,
+  height: 2,
+  rotation: 0,
+  placedRound: 1,
+}
+const catSimulation = new GameSimulation(
+  1,
+  [{ id: 'cat-player', slot: 1, label: 'Player 1', score: 0 }],
+  [cat],
+)
+const catPlayer = catSimulation.players.get('cat-player')
+assert.ok(catPlayer)
+// Enter the cat trigger from the side, then stay on the floor below it. The
+// source component kills already-overlapping players when the claw enables.
+catPlayer.x = 60
+catPlayer.y = 500
+catSimulation.tick(1 / 60)
+assert.equal(catSimulation.snapshot('PLAYING').players[0].alive, true)
+for (let index = 0; index < 60; index += 1) catSimulation.tick(1 / 60)
+assert.equal(catSimulation.snapshot('PLAYING').players[0].alive, false)
+
+const cactus: PlacedTrap = {
+  instanceId: 'cactus-1',
+  trapId: 'triggerhazard',
+  ownerId: 'p1',
+  x: 2,
+  y: 10,
+  width: 1,
+  height: 1,
+  rotation: 0,
+  placedRound: 1,
+}
+const cactusSimulation = new GameSimulation(
+  1,
+  [{ id: 'cactus-player', slot: 1, label: 'Player 1', score: 0 }],
+  [cactus],
+)
+const cactusPlayer = cactusSimulation.players.get('cactus-player')
+assert.ok(cactusPlayer)
+cactusPlayer.x = 110
+cactusPlayer.y = 500
+cactusSimulation.tick(1 / 60)
+assert.equal(cactusSimulation.snapshot('PLAYING').players[0].alive, true)
+for (let index = 0; index < 20; index += 1) cactusSimulation.tick(1 / 60)
+assert.equal(cactusSimulation.snapshot('PLAYING').players[0].alive, true)
+for (let index = 0; index < 40; index += 1) cactusSimulation.tick(1 / 60)
+assert.equal(cactusSimulation.snapshot('PLAYING').players[0].alive, false)
 
 const selfIceSimulation = new GameSimulation(
   1,
