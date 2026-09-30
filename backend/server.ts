@@ -9,10 +9,19 @@ import { RoomManager, type RoomEvent } from './game/roomManager'
 const app = express()
 const httpServer = createServer(app)
 const port = Number(process.env.PORT || 3001)
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || '*')
+const configuredOrigins = (process.env.FRONTEND_ORIGIN || '*')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
+// Keep both currently published Vercel aliases valid while the deployment is
+// being consolidated. FRONTEND_ORIGIN remains authoritative for other hosts.
+const allowedOrigins = configuredOrigins.includes('*')
+  ? configuredOrigins
+  : Array.from(new Set([
+      ...configuredOrigins,
+      'https://travel-woad-five.vercel.app',
+      'https://travel-r1q3.vercel.app',
+    ]))
 const corsOrigin = allowedOrigins.includes('*') ? '*' : allowedOrigins
 const httpCorsOrigin = (origin: string | undefined, callback: (error: Error | null, value?: boolean) => void) => {
   if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
