@@ -344,6 +344,7 @@ export default function PartyGame() {
   const [connectionState, setConnectionState] = useState<'offline' | 'connecting' | 'online'>('offline')
   const [now, setNow] = useState(() => Date.now())
   const reconnectAttempted = useRef(false)
+  const lastHomeActionAt = useRef(0)
   const sessionStorageKey = 'party-platform-session'
 
   const send = useCallback((message: ClientMessage) => {
@@ -359,11 +360,12 @@ export default function PartyGame() {
     if (socketRef.current) return socketRef.current
     setConnectionState('connecting')
     const socket = io(SERVER_URL, {
-      // Mobile browsers and embedded webviews commonly block the initial
-      // WebSocket handshake. Polling is reliable there and Socket.IO upgrades
-      // the connection automatically when WebSocket becomes available.
-      transports: ['polling', 'websocket'],
-      tryAllTransports: true,
+      // Keep the public game path on HTTP polling. It works in mobile
+      // browsers and embedded webviews where WebSocket upgrades are blocked.
+      transports: ['polling'],
+      upgrade: false,
+      forceNew: true,
+      timeout: 20000,
       autoConnect: true,
     })
     socket.on('connect', () => {
@@ -388,9 +390,9 @@ export default function PartyGame() {
       for (const message of pendingMessages.current.splice(0)) socket.emit('client_message', message)
     })
     socket.on('disconnect', () => setConnectionState('offline'))
-    socket.on('connect_error', () => {
+    socket.on('connect_error', (cause) => {
       setConnectionState('offline')
-      setError('无法连接游戏服务器，请确认后端已经启动')
+      setError(`无法连接游戏服务器（${cause.message || '网络超时'}）`)
     })
     socket.on('server_message', (message: ServerMessage) => {
       if (message.type === 'session') {
@@ -535,6 +537,13 @@ export default function PartyGame() {
     send({ type: 'create_room' })
   }
 
+  const runHomeAction = (action: () => void) => {
+    const now = Date.now()
+    if (now - lastHomeActionAt.current < 600) return
+    lastHomeActionAt.current = now
+    action()
+  }
+
   const joinRoom = () => {
     const normalized = roomInput.trim()
     if (!normalized) {
@@ -625,7 +634,11 @@ export default function PartyGame() {
             <h1>跳跳搭档</h1>
             <p className="home-tagline">选择机关、摆到地图里，五局比赛决定胜负。</p>
             <div className="home-actions">
-              <button className="primary-button" onClick={createRoom}>创建房间</button>
+              <button
+                className="primary-button"
+                onPointerUp={(event) => { event.preventDefault(); runHomeAction(createRoom) }}
+                onClick={() => runHomeAction(createRoom)}
+              >创建房间</button>
               <div className="join-line">
                 <input
                   value={roomInput}
@@ -637,9 +650,17 @@ export default function PartyGame() {
                   pattern="[0-9]{4}"
                   aria-label="房间号"
                 />
-                <button className="secondary-button" onClick={joinRoom}>加入房间</button>
+                <button
+                  className="secondary-button"
+                  onPointerUp={(event) => { event.preventDefault(); runHomeAction(joinRoom) }}
+                  onClick={() => runHomeAction(joinRoom)}
+                >加入房间</button>
               </div>
-              <button className="random-join-button" onClick={randomJoin}>随机加入</button>
+              <button
+                className="random-join-button"
+                onPointerUp={(event) => { event.preventDefault(); runHomeAction(randomJoin) }}
+                onClick={() => runHomeAction(randomJoin)}
+              >随机加入</button>
             </div>
             <div className="how-to-play">
               <span>建造</span><strong>20 秒</strong>
