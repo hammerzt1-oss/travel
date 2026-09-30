@@ -366,10 +366,11 @@ export default function PartyGame() {
       upgrade: false,
       forceNew: true,
       timeout: 20000,
-      autoConnect: true,
+      autoConnect: false,
     })
     socket.on('connect', () => {
       setConnectionState('online')
+      setError('')
       const stored = window.sessionStorage.getItem(sessionStorageKey)
       if (stored) {
         try {
@@ -464,6 +465,7 @@ export default function PartyGame() {
       }
     })
     socketRef.current = socket
+    socket.connect()
     return socket
   }, [])
 
@@ -531,7 +533,7 @@ export default function PartyGame() {
   }
 
   const createRoom = () => {
-    setError('')
+    setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
     send({ type: 'create_room' })
@@ -554,14 +556,14 @@ export default function PartyGame() {
       setError('房间号是四位数字')
       return
     }
-    setError('')
+    setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
     send({ type: 'join_room', roomId: normalized })
   }
 
   const randomJoin = () => {
-    setError('')
+    setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
     send({ type: 'random_join' })
@@ -636,7 +638,7 @@ export default function PartyGame() {
             <div className="home-actions">
               <button
                 className="primary-button"
-                onPointerUp={(event) => { event.preventDefault(); runHomeAction(createRoom) }}
+                onTouchEnd={() => runHomeAction(createRoom)}
                 onClick={() => runHomeAction(createRoom)}
               >创建房间</button>
               <div className="join-line">
@@ -652,13 +654,13 @@ export default function PartyGame() {
                 />
                 <button
                   className="secondary-button"
-                  onPointerUp={(event) => { event.preventDefault(); runHomeAction(joinRoom) }}
+                  onTouchEnd={() => runHomeAction(joinRoom)}
                   onClick={() => runHomeAction(joinRoom)}
                 >加入房间</button>
               </div>
               <button
                 className="random-join-button"
-                onPointerUp={(event) => { event.preventDefault(); runHomeAction(randomJoin) }}
+                onTouchEnd={() => runHomeAction(randomJoin)}
                 onClick={() => runHomeAction(randomJoin)}
               >随机加入</button>
             </div>
