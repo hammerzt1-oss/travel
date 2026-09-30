@@ -644,6 +644,9 @@ input:focus { border-color: var(--coral); }
   padding: 0;
   background: transparent;
   pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .pdzz-persistent-game-canvas {
   position: fixed;
@@ -820,6 +823,9 @@ input:focus { border-color: var(--coral); }
      shell must stay transparent so the map remains visible underneath it. */
   background: transparent;
   pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .pdzz-build-screen .build-hud {
   position: absolute;
