@@ -226,6 +226,18 @@ function GameCanvas({
       },
     })
     let cancelled = false
+    // Some mobile WebViews report unstable Laya armature bounds. That makes
+    // one character render at a different scale or position from another.
+    // The Phaser fallback uses the same fixed collider dimensions on every
+    // browser, so keep it authoritative on touch-sized screens.
+    const useLayaCharacters = !window.matchMedia('(pointer: coarse), (max-width: 800px)').matches
+    if (!useLayaCharacters) {
+      return () => {
+        cancelled = true
+        sceneRef.current = null
+        game.destroy(true)
+      }
+    }
     void LayaCharacterRenderer.create(hostRef.current).then((renderer) => {
       if (cancelled) {
         renderer.destroy()
