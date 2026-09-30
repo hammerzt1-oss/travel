@@ -20,7 +20,9 @@ type Screen = 'home' | 'lobby' | 'build' | 'game' | 'result' | 'final'
 type ComponentCategory = 'all' | 'platform' | 'hazard' | 'special'
 type SessionInfo = Extract<ServerMessage, { type: 'session' }>
 
-const SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:3001'
+// Keep local development configurable, but never let a production build fall
+// back to the user's own device. On phones, localhost is the phone itself.
+const SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'https://travel-backend-afnq.onrender.com'
 const PDZZ_VIEWPORT_WIDTH = 750
 // The league recording is a 1220x2712 capture, i.e. a 750x1670 logical
 // viewport. The haystack level itself is authored at 2150x1700, so using
@@ -357,7 +359,11 @@ export default function PartyGame() {
     if (socketRef.current) return socketRef.current
     setConnectionState('connecting')
     const socket = io(SERVER_URL, {
-      transports: ['websocket', 'polling'],
+      // Mobile browsers and embedded webviews commonly block the initial
+      // WebSocket handshake. Polling is reliable there and Socket.IO upgrades
+      // the connection automatically when WebSocket becomes available.
+      transports: ['polling', 'websocket'],
+      tryAllTransports: true,
       autoConnect: true,
     })
     socket.on('connect', () => {
