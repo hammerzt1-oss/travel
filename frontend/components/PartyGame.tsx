@@ -230,8 +230,16 @@ function GameCanvas({
     // one character render at a different scale or position from another.
     // The Phaser fallback uses the same fixed collider dimensions on every
     // browser, so keep it authoritative on touch-sized screens.
-    const useLayaCharacters = !window.matchMedia('(pointer: coarse), (max-width: 800px)').matches
+    const isTouchDevice =
+      window.matchMedia('(pointer: coarse)').matches ||
+      navigator.maxTouchPoints > 0 ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    const useLayaCharacters = window.innerWidth > 800 && !isTouchDevice
     if (!useLayaCharacters) {
+      // A hot reload or a cached route can leave the shared Laya canvas in
+      // this host. Mobile must have exactly one character surface.
+      const staleLayaCanvas = window.Laya?.Render?.canvas
+      if (staleLayaCanvas?.parentElement === hostRef.current) staleLayaCanvas.remove()
       return () => {
         cancelled = true
         sceneRef.current = null

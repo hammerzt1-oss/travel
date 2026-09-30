@@ -26,9 +26,18 @@ const HAYSTACK_CAMERA_X = 100
 const HAYSTACK_CAMERA_Y = 50
 const HAYSTACK_CAMERA_BOUND_Y = 0
 const CHARACTER_AVATAR_CROPS: Record<string, { x: number; y: number; width: number; height: number }> = {
+  // `characterId` is the server refID (`rabbit`), while the extracted asset
+  // is named `rabbit2`. Keep both aliases so protocol IDs never fall back to
+  // rendering the entire 256x256 sheet.
+  rabbit: { x: 36, y: 62, width: 130, height: 180 },
   rabbit2: { x: 36, y: 62, width: 130, height: 180 },
   pig: { x: 34, y: 16, width: 208, height: 224 },
 }
+// The server collider remains 30x60. These are the extracted 256x256 avatar
+// frame coordinates; scale the crop itself to the authored 60px character
+// height so transparent atlas padding cannot make the animal look tiny.
+const CHARACTER_ART_HEIGHT = 60
+const CHARACTER_FRAME_SIZE = 256
 
 function cactusProgress(age: number) {
   if (age < 0.3 || age >= 2.1) return 0
@@ -73,6 +82,7 @@ type PlayerRenderTarget = {
   x: number
   y: number
   direction: -1 | 1
+  characterId: string
   snap: boolean
 }
 
@@ -990,15 +1000,21 @@ export class PartyScene extends Phaser.Scene {
         const textureKey = `character-avatar-${player.characterId}`
         if (!this.textures.exists(textureKey)) continue
         sprite = this.add.image(
-          player.x + PLAYER_COLLIDER_WIDTH / 2,
-          player.y + PLAYER_COLLIDER_HEIGHT / 2,
+          0,
+          0,
           textureKey,
         )
           .setOrigin(0.5, 0.5)
-          .setDisplaySize(PLAYER_COLLIDER_WIDTH, PLAYER_COLLIDER_HEIGHT)
           .setDepth(4)
         const crop = CHARACTER_AVATAR_CROPS[player.characterId]
-        if (crop) sprite.setCrop(crop.x, crop.y, crop.width, crop.height)
+        if (crop) {
+          const artScale = CHARACTER_ART_HEIGHT / crop.height
+          sprite
+            .setCrop(crop.x, crop.y, crop.width, crop.height)
+            .setDisplaySize(CHARACTER_FRAME_SIZE * artScale, CHARACTER_FRAME_SIZE * artScale)
+        } else {
+          sprite.setDisplaySize(PLAYER_COLLIDER_WIDTH, PLAYER_COLLIDER_HEIGHT)
+        }
         this.players.set(player.id, sprite)
       }
 
@@ -1010,14 +1026,35 @@ export class PartyScene extends Phaser.Scene {
         x: targetX,
         y: targetY,
         direction: player.direction,
+        characterId: player.characterId,
         snap: !previousTarget || moved > 260 || !player.alive || player.finished,
       })
       sprite
         .setFlipX(player.direction < 0)
-        // The APK armature is the authoritative in-game character layer.
-        // Keep this Phaser object only as a camera anchor while Laya loads.
         .setAlpha(1)
         .setVisible(this.currentState?.status !== 'BUILDING')
+      if (previousTarget === undefined) {
+        const visual = this.playerVisualPosition(targetX, targetY, player.direction, player.characterId)
+        sprite.setPosition(visual.x, visual.y)
+      }
+    }
+  }
+
+  private playerVisualPosition(
+    colliderCenterX: number,
+    colliderCenterY: number,
+    direction: -1 | 1,
+    characterId: string,
+  ) {
+    const crop = CHARACTER_AVATAR_CROPS[characterId]
+    if (!crop) return { x: colliderCenterX, y: colliderCenterY }
+    const artScale = CHARACTER_ART_HEIGHT / crop.height
+    const cropCenterX = crop.x + crop.width / 2
+    const cropBottomY = crop.y + crop.height
+    const cropCenterOffsetX = (cropCenterX - CHARACTER_FRAME_SIZE / 2) * artScale
+    return {
+      x: colliderCenterX - cropCenterOffsetX * (direction < 0 ? -1 : 1),
+      y: colliderCenterY + PLAYER_COLLIDER_HEIGHT / 2 - (cropBottomY - CHARACTER_FRAME_SIZE / 2) * artScale,
     }
   }
 
@@ -1026,13 +1063,14 @@ export class PartyScene extends Phaser.Scene {
     for (const [id, target] of this.playerTargets) {
       const sprite = this.players.get(id)
       if (!sprite) continue
+      const visual = this.playerVisualPosition(target.x, target.y, target.direction, target.characterId)
       if (target.snap) {
-        sprite.setPosition(target.x, target.y)
+        sprite.setPosition(visual.x, visual.y)
         target.snap = false
         continue
       }
-      sprite.x = Phaser.Math.Linear(sprite.x, target.x, smoothing)
-      sprite.y = Phaser.Math.Linear(sprite.y, target.y, smoothing)
+      sprite.x = Phaser.Math.Linear(sprite.x, visual.x, smoothing)
+      sprite.y = Phaser.Math.Linear(sprite.y, visual.y, smoothing)
     }
   }
 
