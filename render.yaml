@@ -17,4 +17,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: FRONTEND_ORIGIN
-        value: https://travel-woad-five.vercel.app
+        value: https://travel-r1q3.vercel.app
