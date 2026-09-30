@@ -76,6 +76,7 @@ type SceneCallbacks = {
   onPlace: (x: number, y: number) => void
   initialState?: GameState | null
   onMapReady?: (mapId: string) => void
+  useLayaCharacters?: boolean
 }
 
 type PlayerRenderTarget = {
@@ -108,6 +109,7 @@ export class PartyScene extends Phaser.Scene {
     map: (typeof PDZZ_MAP_CATALOG)[number]
     prefix: string
     period: number
+    frame: number
   }> = []
   private renderedMapId: string | null = null
   private renderedMapAssetsReady = false
@@ -132,6 +134,7 @@ export class PartyScene extends Phaser.Scene {
   private currentPreviewRotation: Rotation = 0
   private lastStatus: GameState['status'] | null = null
   private readonly initialMapId: string | null
+  private readonly useLayaCharacters: boolean
 
   private uiTextureFrame(frame: string) {
     return this.textures.exists('pdzz-ui') ? this.resolveAtlasFrame('pdzz-ui', frame) : null
@@ -266,6 +269,7 @@ export class PartyScene extends Phaser.Scene {
     super('PartyScene')
     this.callbacks = callbacks
     this.initialMapId = callbacks.initialState?.level.mapId ?? null
+    this.useLayaCharacters = callbacks.useLayaCharacters ?? false
   }
 
   private loadMapAssets(map: (typeof PDZZ_MAP_CATALOG)[number]) {
@@ -365,7 +369,7 @@ export class PartyScene extends Phaser.Scene {
   }
 
   update(time: number) {
-    this.updatePlayerSprites(this.game.loop.delta)
+    if (!this.useLayaCharacters) this.updatePlayerSprites(this.game.loop.delta)
     // State can arrive before Phaser has finished decoding an image loaded by
     // the map manifest. Retry the authored layer after the loader settles so
     // the first build frame cannot be stuck on the fallback color.
@@ -383,11 +387,15 @@ export class PartyScene extends Phaser.Scene {
     // being mistaken for the original scene.
     for (const animated of this.animatedMapSprites) {
       const frameNumber = Math.floor(time / (animated.period * 1000)) % 3 + 1
+      if (animated.frame === frameNumber) continue
       const texture = this.mapTexture(animated.map, `${animated.prefix}${frameNumber}`)
-      if (texture) animated.sprite.setTexture(texture.key, texture.frame)
+      if (texture) {
+        animated.sprite.setTexture(texture.key, texture.frame)
+        animated.frame = frameNumber
+      }
     }
     if (this.currentState && time >= this.nextTrapAnimationProbeAt) {
-      this.nextTrapAnimationProbeAt = time + 50
+      this.nextTrapAnimationProbeAt = time + 100
       this.drawPlacedTraps(this.currentState, this.currentBuild)
     }
     this.updateHudCountdown()
@@ -571,6 +579,7 @@ export class PartyScene extends Phaser.Scene {
             map,
             prefix: `${grassAnimation[1]}${grassAnimation[2]}`,
             period,
+            frame: 0,
           })
         }
         this.worldDecorations.push(sprite)
@@ -996,7 +1005,7 @@ export class PartyScene extends Phaser.Scene {
 
     for (const player of snapshots) {
       let sprite = this.players.get(player.id)
-      if (!sprite) {
+      if (!sprite && !this.useLayaCharacters) {
         const textureKey = `character-avatar-${player.characterId}`
         if (!this.textures.exists(textureKey)) continue
         sprite = this.add.image(
@@ -1029,10 +1038,11 @@ export class PartyScene extends Phaser.Scene {
         characterId: player.characterId,
         snap: !previousTarget || moved > 260 || !player.alive || player.finished,
       })
+      if (!sprite) continue
       sprite
         .setFlipX(player.direction < 0)
         .setAlpha(1)
-        .setVisible(this.currentState?.status !== 'BUILDING')
+        .setVisible(!this.useLayaCharacters && this.currentState?.status !== 'BUILDING')
       if (previousTarget === undefined) {
         const visual = this.playerVisualPosition(targetX, targetY, player.direction, player.characterId)
         sprite.setPosition(visual.x, visual.y)
@@ -1246,7 +1256,8 @@ export class PartyScene extends Phaser.Scene {
     camera.setZoom(isHaystack ? HAYSTACK_PLAY_ZOOM : 1)
     const maxScrollX = Math.max(0, state.level.width - camera.width / camera.zoom)
     const localSprite = this.players.get(local.id)
-    const localWorldX = localSprite?.x ?? local.x + PLAYER_COLLIDER_WIDTH / 2
+    const localTarget = this.playerTargets.get(local.id)
+    const localWorldX = localSprite?.x ?? localTarget?.x ?? local.x + PLAYER_COLLIDER_WIDTH / 2
     const targetX = localWorldX - camera.width / (2 * camera.zoom)
     const scrollX = Phaser.Math.Clamp(targetX, 0, maxScrollX)
     // The APK keeps the haystack race on a fixed vertical track. The player
@@ -1258,8 +1269,15 @@ export class PartyScene extends Phaser.Scene {
       // drift vertically while the player runs and jumps.
       camera.setScroll(scrollX, HAYSTACK_CAMERA_Y)
     } else {
-      const sprite = this.players.get(local.id)
-      if (sprite) camera.startFollow(sprite, true, 0.12, 0.12)
+      if (localSprite) {
+        camera.startFollow(localSprite, true, 0.12, 0.12)
+      } else {
+        camera.stopFollow()
+        camera.setScroll(
+          scrollX,
+          Phaser.Math.Clamp(local.y - camera.height / (2 * camera.zoom), 0, Math.max(0, state.level.height - camera.height / camera.zoom)),
+        )
+      }
     }
     this.lastStatus = state.status
   }

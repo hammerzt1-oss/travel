@@ -194,8 +194,17 @@ function GameCanvas({
 
   useEffect(() => {
     if (!hostRef.current) return
+    const isTouchDevice =
+      window.matchMedia('(pointer: coarse)').matches ||
+      navigator.maxTouchPoints > 0 ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    // The APK uses the Laya armature and its raw texture for the playable
+    // animal. This is also the authoritative layer on mobile; Phaser remains
+    // responsible for the map, traps and camera only.
+    const useLayaCharacters = true
     const scene = new PartyScene({
       initialState: state,
+      useLayaCharacters,
       onReady: (readyScene) => {
         sceneRef.current = readyScene
         readyScene.setState(state, localPlayerId, build, countdown)
@@ -215,6 +224,7 @@ function GameCanvas({
       transparent: true,
       backgroundColor: 'transparent',
       render: { antialias: true, pixelArt: false },
+      fps: { target: isTouchDevice ? 30 : 60, limit: isTouchDevice ? 30 : 0, forceSetTimeOut: isTouchDevice },
       physics: {
         default: 'arcade',
         arcade: { debug: false },
@@ -230,23 +240,7 @@ function GameCanvas({
     // one character render at a different scale or position from another.
     // The Phaser fallback uses the same fixed collider dimensions on every
     // browser, so keep it authoritative on touch-sized screens.
-    const isTouchDevice =
-      window.matchMedia('(pointer: coarse)').matches ||
-      navigator.maxTouchPoints > 0 ||
-      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-    const useLayaCharacters = window.innerWidth > 800 && !isTouchDevice
-    if (!useLayaCharacters) {
-      // A hot reload or a cached route can leave the shared Laya canvas in
-      // this host. Mobile must have exactly one character surface.
-      const staleLayaCanvas = window.Laya?.Render?.canvas
-      if (staleLayaCanvas?.parentElement === hostRef.current) staleLayaCanvas.remove()
-      return () => {
-        cancelled = true
-        sceneRef.current = null
-        game.destroy(true)
-      }
-    }
-    void LayaCharacterRenderer.create(hostRef.current).then((renderer) => {
+    void LayaCharacterRenderer.create(hostRef.current, { reducedFrameRate: isTouchDevice }).then((renderer) => {
       if (cancelled) {
         renderer.destroy()
         return
@@ -365,7 +359,32 @@ export default function PartyGame() {
   const [now, setNow] = useState(() => Date.now())
   const reconnectAttempted = useRef(false)
   const lastHomeActionAt = useRef(0)
+  const pendingGameStateRef = useRef<GameState | null>(null)
+  const gameStateFlushTimerRef = useRef<number | null>(null)
+  const lastGameStateCommitAt = useRef(0)
   const sessionStorageKey = 'party-platform-session'
+
+  const publishGameState = useCallback((next: GameState | null, immediate = false) => {
+    pendingGameStateRef.current = next
+    const currentTime = performance.now()
+    const elapsed = currentTime - lastGameStateCommitAt.current
+    if (immediate || elapsed >= 100) {
+      if (gameStateFlushTimerRef.current !== null) {
+        window.clearTimeout(gameStateFlushTimerRef.current)
+        gameStateFlushTimerRef.current = null
+      }
+      lastGameStateCommitAt.current = currentTime
+      setGameState(next)
+      return
+    }
+    if (gameStateFlushTimerRef.current === null) {
+      gameStateFlushTimerRef.current = window.setTimeout(() => {
+        gameStateFlushTimerRef.current = null
+        lastGameStateCommitAt.current = performance.now()
+        setGameState(pendingGameStateRef.current)
+      }, Math.max(0, 100 - elapsed))
+    }
+  }, [])
 
   const send = useCallback((message: ClientMessage) => {
     const socket = socketRef.current
@@ -452,7 +471,7 @@ export default function PartyGame() {
       }
       if (message.type === 'room_state') {
         setRoom(message.state)
-        setGameState(message.state.gameState)
+        publishGameState(message.state.gameState, true)
         setResult(message.state.lastResult)
         if (message.state.status === 'BUILDING') {
           setScreen('build')
@@ -476,7 +495,7 @@ export default function PartyGame() {
         return
       }
       if (message.type === 'game_state') {
-        setGameState(message.state)
+        publishGameState(message.state, message.state.status !== 'PLAYING')
         if (message.state.status === 'PLAYING') setCountdown(null)
         setScreen('game')
         return
@@ -490,7 +509,7 @@ export default function PartyGame() {
     socketRef.current = socket
     socket.connect()
     return socket
-  }, [])
+  }, [publishGameState])
 
   useEffect(() => {
     if (window.sessionStorage.getItem(sessionStorageKey) || screen === 'home') connect()
@@ -498,10 +517,11 @@ export default function PartyGame() {
 
   useEffect(() => () => {
     socketRef.current?.disconnect()
+    if (gameStateFlushTimerRef.current !== null) window.clearTimeout(gameStateFlushTimerRef.current)
   }, [])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 100)
+    const timer = window.setInterval(() => setNow(Date.now()), 250)
     return () => window.clearInterval(timer)
   }, [])
 

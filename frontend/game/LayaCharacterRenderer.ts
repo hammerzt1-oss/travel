@@ -9,6 +9,7 @@ type LayaRuntime = {
     addChild: (child: unknown) => void
     removeChild: (child: unknown) => void
     removeChildren: () => void
+    frameRate?: string
   }
   Texture: new (source: HTMLImageElement) => unknown
   Templet: new () => {
@@ -70,6 +71,7 @@ const CHARACTER_INTERPOLATION_DELAY_MS = 70
 const CHARACTER_MAX_EXTRAPOLATION_MS = 80
 const CHARACTER_MAX_HISTORY = 8
 const CHARACTER_ART_HEIGHT = 60
+const CHARACTER_RENDER_INTERVAL_MS = 1000 / 30
 const animationForState: Record<PlayerSnapshot['animationState'], string> = {
   idle: 'idle',
   run: 'run',
@@ -140,15 +142,18 @@ export class LayaCharacterRenderer {
   private readonly instances = new Map<string, CharacterInstance>()
   private readonly pending = new Map<string, Promise<void>>()
   private readonly tracks = new Map<string, PlayerTrack>()
+  private readonly latestPlayers = new Map<string, PlayerSnapshot>()
   private latestState: GameState | null = null
   private latestScene: PartyScene | null = null
   private frameHandle: number | null = null
+  private lastRenderAt = 0
   private disposed = false
 
-  private constructor(host: HTMLElement, runtime: LayaRuntime) {
+  private constructor(host: HTMLElement, runtime: LayaRuntime, reducedFrameRate: boolean) {
     this.host = host
     this.runtime = runtime
     if (!runtime.stage || !runtime.Render?.canvas) runtime.init(PDZZ_VIEWPORT_WIDTH, PDZZ_VIEWPORT_HEIGHT)
+    if (reducedFrameRate && runtime.stage) runtime.stage.frameRate = 'slow'
     const canvas = runtime.Render.canvas
     canvas.style.position = 'absolute'
     canvas.style.inset = '0'
@@ -166,11 +171,11 @@ export class LayaCharacterRenderer {
     this.frameHandle = window.requestAnimationFrame(this.renderFrame)
   }
 
-  static async create(host: HTMLElement) {
+  static async create(host: HTMLElement, options: { reducedFrameRate?: boolean } = {}) {
     const runtime = await loadRuntime()
     if (!runtime.stage || !runtime.Render?.canvas) runtime.init(PDZZ_VIEWPORT_WIDTH, PDZZ_VIEWPORT_HEIGHT)
     console.info('[pdzz] Laya character renderer ready')
-    return new LayaCharacterRenderer(host, runtime)
+    return new LayaCharacterRenderer(host, runtime, options.reducedFrameRate ?? false)
   }
 
   update(state: GameState | null, scene: PartyScene | null) {
@@ -179,6 +184,8 @@ export class LayaCharacterRenderer {
     this.latestState = state
     this.latestScene = scene
     const activeIds = new Set(state.players.map((player) => player.id))
+    this.latestPlayers.clear()
+    for (const player of state.players) this.latestPlayers.set(player.id, player)
     for (const [id, instance] of this.instances) {
       if (activeIds.has(id)) continue
       instance.skeleton.destroy(true)
@@ -202,6 +209,7 @@ export class LayaCharacterRenderer {
     for (const instance of this.instances.values()) instance.skeleton.destroy(true)
     this.instances.clear()
     this.tracks.clear()
+    this.latestPlayers.clear()
     this.latestState = null
     this.latestScene = null
     LayaCharacterRenderer.activeCount = Math.max(0, LayaCharacterRenderer.activeCount - 1)
@@ -225,7 +233,6 @@ export class LayaCharacterRenderer {
       return
     }
     scene.setPlayerFallbackVisible(player.id, false)
-    this.renderPlayer(player.id, state, scene, performance.now())
   }
 
   private recordSample(player: PlayerSnapshot, receivedAt: number) {
@@ -282,7 +289,7 @@ export class LayaCharacterRenderer {
   }
 
   private renderPlayer(playerId: string, state: GameState, scene: PartyScene, now: number) {
-    const player = state.players.find((item) => item.id === playerId)
+    const player = this.latestPlayers.get(playerId)
     const instance = this.instances.get(playerId)
     const track = this.tracks.get(playerId)
     if (!player || !instance || !track) return
@@ -303,14 +310,9 @@ export class LayaCharacterRenderer {
     // a root at its torso (and some armatures have a large empty local box).
     // Scale the authored visible bounds to the controller height, then move
     // the root so the visible bounds' center/feet match the collider exactly.
-    // Some mobile Canvas2D builds return {0,0,0,0} until the armature has
-    // rendered once. Re-measure here so the first valid pose can immediately
-    // replace the conservative avatar fallback scale.
-    const liveBounds = instance.skeleton.getBounds?.()
-    if (liveBounds && liveBounds.width > 0 && liveBounds.height > 0) {
-      instance.bounds = liveBounds
-      instance.artScale = CHARACTER_ART_HEIGHT / liveBounds.height
-    }
+    // Do not call getBounds on every frame: mobile Canvas2D can return a
+    // different pose box while an animation is playing, which changes the
+    // character's skin size and makes the animal jump or appear duplicated.
     const baseScale = Math.min(position.zoom, 1) * instance.artScale
     const signedScaleX = baseScale * (player.direction < 0 ? -1 : 1)
     const bounds = instance.bounds
@@ -326,7 +328,12 @@ export class LayaCharacterRenderer {
 
   private renderFrame = (now: number) => {
     if (this.disposed) return
-    if (this.latestState && this.latestScene) {
+    if (
+      this.latestState &&
+      this.latestScene &&
+      (this.lastRenderAt === 0 || now - this.lastRenderAt >= CHARACTER_RENDER_INTERVAL_MS)
+    ) {
+      this.lastRenderAt = now
       for (const player of this.latestState.players) {
         this.renderPlayer(player.id, this.latestState, this.latestScene, now)
       }
@@ -361,6 +368,9 @@ export class LayaCharacterRenderer {
       }
       const idle = animations.has('idle') ? 'idle' : animations.values().next().value
       if (idle) skeleton.play(idle, true, true)
+      // Measure one deterministic idle pose. The bounds are deliberately
+      // retained for the whole instance; animation must not change the
+      // character's authored scale or foot anchor.
       const bounds = skeleton.getBounds?.()
       const measuredScale = bounds && bounds.height > 0 ? CHARACTER_ART_HEIGHT / bounds.height : null
       const artScale = measuredScale ?? fallbackCharacterArtScale[character.avatarID] ?? 0.2
