@@ -366,6 +366,9 @@ export default function PartyGame() {
       upgrade: false,
       forceNew: true,
       timeout: 20000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       autoConnect: false,
     })
     socket.on('connect', () => {
@@ -470,8 +473,8 @@ export default function PartyGame() {
   }, [])
 
   useEffect(() => {
-    if (window.sessionStorage.getItem(sessionStorageKey)) connect()
-  }, [connect])
+    if (window.sessionStorage.getItem(sessionStorageKey) || screen === 'home') connect()
+  }, [connect, screen])
 
   useEffect(() => () => {
     socketRef.current?.disconnect()
@@ -640,7 +643,7 @@ export default function PartyGame() {
                 className="primary-button"
                 onTouchEnd={() => runHomeAction(createRoom)}
                 onClick={() => runHomeAction(createRoom)}
-              >创建房间</button>
+              >{connectionState === 'connecting' ? '正在连接…' : '创建房间'}</button>
               <div className="join-line">
                 <input
                   value={roomInput}
