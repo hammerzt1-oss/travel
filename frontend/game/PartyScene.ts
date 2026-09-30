@@ -113,6 +113,8 @@ export class PartyScene extends Phaser.Scene {
   private hudCountdownRoundText?: Phaser.GameObjects.Text
   private hudCountdownTargetText?: Phaser.GameObjects.Text
   private previewSprite?: Phaser.GameObjects.Image
+  private previewTrapContainer?: Phaser.GameObjects.Container
+  private previewTrapSignature = ''
   private previewGraphics?: Phaser.GameObjects.Graphics
   private previewText?: Phaser.GameObjects.Text
   private previewCell = { x: 0, y: 0 }
@@ -604,6 +606,37 @@ export class PartyScene extends Phaser.Scene {
     return this.addTextureImage(container, { key: 'pdzz-game', frame }, x, y, scale, originX, originY)
   }
 
+  private trapVisualAnchor(
+    trapId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    cell: number,
+    rotation: Rotation,
+  ) {
+    if (trapId !== 'triggerspikes') {
+      return {
+        x: (x + width / 2) * cell,
+        y: (y + height / 2) * cell,
+        angle: rotation,
+      }
+    }
+
+    // The APK spring-spike art is authored as a horizontal 4x1 armature.
+    // After a quarter turn its pivot is the centre of the rotated 1x4
+    // footprint; the old bottom-centre anchor moved the live trap two cells.
+    // Phaser's clockwise angle matches the server's rotation face (90 degrees
+    // exposes the left-side trigger), so do not mirror the angle here.
+    const angle = rotation
+    const vertical = angle === 90 || angle === 270
+    return {
+      x: (x + width / 2) * cell,
+      y: (y + (vertical ? height / 2 : height)) * cell,
+      angle,
+    }
+  }
+
   private trapVisualSignature(trap: GameState['level']['traps'][number]) {
     const phase = trap.phase ?? 'idle'
     const animationStep = trap.trapId === 'triggerspikes'
@@ -759,13 +792,20 @@ export class PartyScene extends Phaser.Scene {
         this.rebuildTrapVisual(sprite, state, trap, component)
         this.trapRenderSignatures.set(trap.instanceId, signature)
       }
-      const isTriggerSpikes = trap.trapId === 'triggerspikes'
+      const visualAnchor = this.trapVisualAnchor(
+        trap.trapId,
+        trap.x,
+        trap.y,
+        trap.width,
+        trap.height,
+        state.level.cellSize,
+        trap.rotation,
+      )
       sprite
-        .setPosition(
-          trap.x * state.level.cellSize + offsetX + (trap.width * state.level.cellSize) / 2,
-          trap.y * state.level.cellSize + offsetY + (isTriggerSpikes ? trap.height * state.level.cellSize : (trap.height * state.level.cellSize) / 2),
-        )
-        .setAngle(trap.visualRotation ?? trap.rotation)
+        .setPosition(visualAnchor.x + offsetX, visualAnchor.y + offsetY)
+        .setAngle(trap.trapId === 'triggerspikes'
+          ? visualAnchor.angle
+          : (trap.visualRotation ?? trap.rotation))
     }
   }
 
@@ -777,6 +817,9 @@ export class PartyScene extends Phaser.Scene {
     this.gridGraphics = undefined
     this.previewSprite?.destroy()
     this.previewSprite = undefined
+    this.previewTrapContainer?.destroy()
+    this.previewTrapContainer = undefined
+    this.previewTrapSignature = ''
     this.previewGraphics = undefined
     this.previewText = undefined
     if (state.status !== 'BUILDING') return
@@ -838,26 +881,68 @@ export class PartyScene extends Phaser.Scene {
     if (!this.previewGraphics || !this.previewText) return
     const component = this.componentFor(trapId)
     if (!component) return
-    const texture = this.componentTexture(component)
-    if (!texture) return
-    if (!this.previewSprite) {
-      this.previewSprite = this.add.image(0, 0, texture.key, texture.frame).setOrigin(0.5).setDepth(8)
+    const visualAnchor = this.trapVisualAnchor(
+      trapId,
+      this.previewCell.x,
+      this.previewCell.y,
+      width,
+      height,
+      state.level.cellSize,
+      rotation,
+    )
+    if (trapId === 'triggerspikes') {
+      this.previewSprite?.destroy()
+      this.previewSprite = undefined
+      if (!this.previewTrapContainer) {
+        this.previewTrapContainer = this.add.container(0, 0).setDepth(8)
+      }
+      const signature = `${trapId}|${rotation}`
+      if (this.previewTrapSignature !== signature) {
+        this.rebuildTrapVisual(
+          this.previewTrapContainer,
+          state,
+          {
+            instanceId: 'preview-triggerspikes',
+            trapId,
+            ownerId: this.localPlayerId ?? 'preview',
+            x: this.previewCell.x,
+            y: this.previewCell.y,
+            width,
+            height,
+            rotation,
+            placedRound: state.round,
+            phase: 'idle',
+          },
+          component,
+        )
+        this.previewTrapSignature = signature
+      }
+      this.previewTrapContainer
+        .setPosition(visualAnchor.x, visualAnchor.y)
+        .setAngle(visualAnchor.angle)
+        .setAlpha(0.68)
     } else {
-      this.previewSprite.setTexture(texture.key, texture.frame)
-    }
-    this.previewSprite
-      .setOrigin(0.5, 0.5)
-      .setPosition(
-        (this.previewCell.x + width / 2) * state.level.cellSize,
-        (this.previewCell.y + height / 2) * state.level.cellSize,
-      )
+      this.previewTrapContainer?.destroy()
+      this.previewTrapContainer = undefined
+      this.previewTrapSignature = ''
+      const texture = this.componentTexture(component)
+      if (!texture) return
+      if (!this.previewSprite) {
+        this.previewSprite = this.add.image(0, 0, texture.key, texture.frame).setOrigin(0.5).setDepth(8)
+      } else {
+        this.previewSprite.setTexture(texture.key, texture.frame)
+      }
+      this.previewSprite
+        .setOrigin(0.5, 0.5)
+        .setPosition(visualAnchor.x, visualAnchor.y)
         .setDisplaySize(
-         (component.viewWidth ?? component.width) * state.level.cellSize,
-         (component.viewHeight ?? component.height) * state.level.cellSize,
-      )
-      .setAngle(rotation)
-      .setAlpha(0.68)
-      .setTint(valid ? 0xffffff : 0xffb4a7)
+          (component.viewWidth ?? component.width) * state.level.cellSize,
+          (component.viewHeight ?? component.height) * state.level.cellSize,
+        )
+        .setAngle(rotation)
+        .setAlpha(0.68)
+        .setTint(valid ? 0xffffff : 0xffb4a7)
+    }
     this.previewGraphics.clear()
     const color = valid ? 0x5b9c73 : 0xef765b
     this.previewGraphics.fillStyle(color, 0.48)

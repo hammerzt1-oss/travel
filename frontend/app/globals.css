@@ -658,6 +658,11 @@ input:focus { border-color: var(--coral); }
   transform: translate(-50%, -50%);
   overflow: hidden;
   background: #24c1d3;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
 }
 .pdzz-persistent-game-canvas[data-map-id="levelhaystack2"] {
   background-color: #24c1d3;
@@ -680,6 +685,10 @@ input:focus { border-color: var(--coral); }
 }
 .pdzz-persistent-game-canvas canvas {
   display: block;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .pdzz-map-fallback {
   position: absolute;

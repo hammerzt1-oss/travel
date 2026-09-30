@@ -253,6 +253,8 @@ function GameCanvas({
       aria-label="横版平台游戏画面"
       data-has-state={state ? 'yes' : 'no'}
       data-game-status={state?.status ?? 'none'}
+      onContextMenu={(event) => event.preventDefault()}
+      onDragStart={(event) => event.preventDefault()}
     >
       <MapFallbackLayer state={state} hidden={mapReady} />
     </div>

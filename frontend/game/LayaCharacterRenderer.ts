@@ -85,12 +85,14 @@ const animationForState: Record<PlayerSnapshot['animationState'], string> = {
 // extracted armatures to the proportions in the league recording.
 const fallbackCharacterArtScale: Record<string, number> = {
   rabbit2: 0.34,
-  // pig.sk has a wider authored art box than rabbit2.sk. The APK display
-  // height is still close to one 30x60 controller, not the raw 1024px sheet.
-  // Keep the pig's visible silhouette at the recording's proportion instead
-  // of letting the large DragonBones art box dominate the controller.
-  pig: 0.065,
+  // pig.sk reports a 351.95px authored pose box. Keep its fallback at the
+  // same 60px gameplay height when a mobile browser returns an empty bounds
+  // object during the first animation tick.
+  pig: CHARACTER_ART_HEIGHT / 351.9543828946005,
 }
+
+const preventCanvasMenu = (event: Event) => event.preventDefault()
+const preventCanvasDrag = (event: DragEvent) => event.preventDefault()
 
 function loadRuntime() {
   if (typeof window === 'undefined') return Promise.reject(new Error('Laya runtime requires a browser'))
@@ -155,6 +157,10 @@ export class LayaCharacterRenderer {
     canvas.style.pointerEvents = 'none'
     canvas.style.background = 'transparent'
     canvas.style.zIndex = '3'
+    canvas.draggable = false
+    canvas.setAttribute('aria-hidden', 'true')
+    canvas.addEventListener('contextmenu', preventCanvasMenu)
+    canvas.addEventListener('dragstart', preventCanvasDrag)
     host.appendChild(canvas)
     LayaCharacterRenderer.activeCount += 1
     this.frameHandle = window.requestAnimationFrame(this.renderFrame)
@@ -202,7 +208,11 @@ export class LayaCharacterRenderer {
     // The runtime and canvas are shared by StrictMode's short-lived probe
     // renderer and the real renderer. Only remove the canvas when the last
     // owner is gone; never clear the global stage from one instance.
-    if (LayaCharacterRenderer.activeCount === 0) this.runtime.Render.canvas.remove()
+    if (LayaCharacterRenderer.activeCount === 0) {
+      this.runtime.Render.canvas.removeEventListener('contextmenu', preventCanvasMenu)
+      this.runtime.Render.canvas.removeEventListener('dragstart', preventCanvasDrag)
+      this.runtime.Render.canvas.remove()
+    }
   }
 
   private updatePlayer(player: PlayerSnapshot, state: GameState, scene: PartyScene) {
@@ -293,6 +303,14 @@ export class LayaCharacterRenderer {
     // a root at its torso (and some armatures have a large empty local box).
     // Scale the authored visible bounds to the controller height, then move
     // the root so the visible bounds' center/feet match the collider exactly.
+    // Some mobile Canvas2D builds return {0,0,0,0} until the armature has
+    // rendered once. Re-measure here so the first valid pose can immediately
+    // replace the conservative avatar fallback scale.
+    const liveBounds = instance.skeleton.getBounds?.()
+    if (liveBounds && liveBounds.width > 0 && liveBounds.height > 0) {
+      instance.bounds = liveBounds
+      instance.artScale = CHARACTER_ART_HEIGHT / liveBounds.height
+    }
     const baseScale = Math.min(position.zoom, 1) * instance.artScale
     const signedScaleX = baseScale * (player.direction < 0 ? -1 : 1)
     const bounds = instance.bounds
