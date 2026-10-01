@@ -122,6 +122,8 @@ export type PlayerSnapshot = {
   score: number
   characterId: string
   characterAsset: string | null
+  /** Highest client input sequence already consumed by the authoritative tick. */
+  lastProcessedInputSequence: number
   bot?: boolean
 }
 
@@ -275,7 +277,7 @@ export type ClientMessage =
   | { type: 'rotate_trap'; rotation: Rotation }
   | { type: 'cancel_trap' }
   | { type: 'confirm_build' }
-  | { type: 'input'; input: PlayerInput }
+  | { type: 'input'; input: PlayerInput; sequence: number }
   | { type: 'return_to_room' }
   | { type: 'kick_player'; playerId: string }
 

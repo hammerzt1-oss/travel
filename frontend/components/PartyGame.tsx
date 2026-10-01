@@ -193,7 +193,7 @@ function MapWarmupLayer({ state }: { state: GameState | null }) {
 }
 */
 
-type LocalInputListener = (playerId: string | null, input: PlayerInput) => void
+type LocalInputListener = (playerId: string | null, input: PlayerInput, sequence?: number) => void
 
 function GameCanvas({
   state,
@@ -411,6 +411,7 @@ export default function PartyGame() {
   const gameStateFlushTimerRef = useRef<number | null>(null)
   const lastGameStateCommitAt = useRef(0)
   const localInputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
+  const inputSequenceRef = useRef(0)
   const localInputListenerRef = useRef<LocalInputListener | null>(null)
   const [localInput, setLocalInput] = useState<PlayerInput>({ left: false, right: false, jump: false })
   const [nameDraft, setNameDraft] = useState('')
@@ -450,12 +451,14 @@ export default function PartyGame() {
 
   const updateLocalInput = useCallback((input: PlayerInput) => {
     const nextInput = { ...input }
+    const sequence = inputSequenceRef.current + 1
+    inputSequenceRef.current = sequence
     localInputRef.current = nextInput
     // Update local prediction and animation in the same pointer/keyboard
     // event, before React schedules the next render.
-    localInputListenerRef.current?.(localPlayerId, nextInput)
+    localInputListenerRef.current?.(localPlayerId, nextInput, sequence)
     setLocalInput(nextInput)
-    send({ type: 'input', input: nextInput })
+    send({ type: 'input', input: nextInput, sequence })
   }, [localPlayerId, send])
 
   const connect = useCallback(() => {
@@ -597,7 +600,12 @@ export default function PartyGame() {
     // React renders to the hot path.
     const timer = window.setInterval(() => {
       const socket = socketRef.current
-      if (socket?.connected) socket.emit('client_message', { type: 'input', input: localInputRef.current })
+      if (socket?.connected) {
+        const sequence = inputSequenceRef.current + 1
+        inputSequenceRef.current = sequence
+        socket.emit('client_message', { type: 'input', input: localInputRef.current, sequence })
+        localInputListenerRef.current?.(localPlayerId, localInputRef.current, sequence)
+      }
     }, GAME_STATE_RENDER_INTERVAL_MS)
     return () => window.clearInterval(timer)
   }, [screen, gameState?.status])

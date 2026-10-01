@@ -53,6 +53,7 @@ type PositionSample = {
 type PlayerTrack = {
   samples: PositionSample[]
   snap: boolean
+  lastAuthoritativeInputSequence: number
   localPrediction?: {
     x: number
     y: number
@@ -162,6 +163,7 @@ export class LayaCharacterRenderer {
   private latestScene: PartyScene | null = null
   private localPlayerId: string | null = null
   private localInput: PlayerInput = { left: false, right: false, jump: false }
+  private localInputSequence = 0
   private frameHandle: number | null = null
   private lastRenderAt = 0
   private disposed = false
@@ -246,13 +248,14 @@ export class LayaCharacterRenderer {
     }
   }
 
-  setLocalInput(playerId: string | null, input: PlayerInput) {
+  setLocalInput(playerId: string | null, input: PlayerInput, sequence?: number) {
     if (this.disposed) return
     const now = performance.now()
     this.advanceLocalPrediction(now)
     const previous = this.localInput
     this.localPlayerId = playerId
     this.localInput = { ...input }
+    if (sequence !== undefined) this.localInputSequence = Math.max(this.localInputSequence, sequence)
     if (!playerId || !input.jump || previous.jump) return
     const player = this.latestPlayers.get(playerId)
     const track = this.tracks.get(playerId)
@@ -320,7 +323,11 @@ export class LayaCharacterRenderer {
       velocityY: player.velocityY,
     }
     if (!previous) {
-      const track: PlayerTrack = { samples: [sample], snap: true }
+      const track: PlayerTrack = {
+        samples: [sample],
+        snap: true,
+        lastAuthoritativeInputSequence: player.lastProcessedInputSequence ?? 0,
+      }
       if (player.id === this.localPlayerId) track.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
       this.tracks.set(player.id, track)
       return
@@ -339,6 +346,27 @@ export class LayaCharacterRenderer {
         return
       }
       this.advanceLocalPrediction(receivedAt)
+      const acknowledgedSequence = Number.isFinite(player.lastProcessedInputSequence)
+        ? Math.max(0, Math.floor(player.lastProcessedInputSequence))
+        : 0
+      const hasNewAcknowledgement = acknowledgedSequence > previous.lastAuthoritativeInputSequence
+      previous.lastAuthoritativeInputSequence = Math.max(
+        previous.lastAuthoritativeInputSequence,
+        acknowledgedSequence,
+      )
+      const isTerminalState = player.animationState === 'death' || !player.alive || player.finished
+      // Death and finish are discrete authoritative outcomes. They must win
+      // even when the input packet that caused them has not reached the
+      // client yet.
+      if (isTerminalState) {
+        previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+        return
+      }
+      // Do not reconcile against a snapshot that predates the local input
+      // stream. The old snapshot is expected to be behind while a touch is
+      // held; using it as a target creates the visible move-back-and-move
+      // cycle on mobile networks.
+      if (!hasNewAcknowledgement || acknowledgedSequence < this.localInputSequence) return
       const errorX = sample.x - prediction.x
       const errorY = sample.y - prediction.y
       // Large corrections are respawns, deaths, or a server-side collision

@@ -132,6 +132,22 @@ openingJumpSimulation.tick(1 / 60)
 assert.equal(openingJumpPlayer.jumpConsumed, true)
 assert.ok(openingJumpPlayer.velocityY < 0)
 
+// Network packets can arrive after a newer input packet has already been
+// applied. The authoritative controller must keep the newest sequence and
+// expose it in snapshots so the client never reconciles against old input.
+const inputSequenceSimulation = new GameSimulation(
+  1,
+  [{ id: 'input-sequence', slot: 1, label: 'Player 1', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+inputSequenceSimulation.setInput('input-sequence', { left: false, right: true, jump: false }, 7)
+inputSequenceSimulation.setInput('input-sequence', { left: true, right: false, jump: false }, 6)
+inputSequenceSimulation.tick(1 / 60)
+const inputSequenceSnapshot = inputSequenceSimulation.snapshot('PLAYING').players[0]
+assert.equal(inputSequenceSnapshot.lastProcessedInputSequence, 7)
+assert.ok(inputSequenceSnapshot.velocityX > 0)
+
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)
 haystackPlayer.x = 1800

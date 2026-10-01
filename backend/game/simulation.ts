@@ -44,6 +44,7 @@ type SimPlayer = {
   ready: boolean
   score: number
   input: PlayerInput
+  lastProcessedInputSequence: number
   jumpConsumed: boolean
   jumpBufferUntil: number
   /** APK's fallingTime: accumulated descending air time, not wall contact time. */
@@ -882,6 +883,7 @@ export class GameSimulation {
             connected: true,
             ready: true,
             input: { left: false, right: false, jump: false },
+            lastProcessedInputSequence: 0,
             jumpConsumed: false,
             jumpBufferUntil: 0,
             fallingTime: 0,
@@ -924,10 +926,14 @@ export class GameSimulation {
     if (player && player.alive && !player.finished) this.kill(player)
   }
 
-  setInput(playerId: string, input: PlayerInput) {
+  setInput(playerId: string, input: PlayerInput, sequence = 0) {
     const player = this.players.get(playerId)
     if (!player || !player.alive || player.finished) return
+    if (sequence < player.lastProcessedInputSequence) return
     player.input = cloneInput(input)
+    player.lastProcessedInputSequence = Number.isFinite(sequence)
+      ? Math.max(0, Math.floor(sequence))
+      : player.lastProcessedInputSequence
   }
 
   tick(dt: number) {
@@ -1805,6 +1811,7 @@ export class GameSimulation {
       score: player.score,
       characterId: player.characterId,
       characterAsset: player.characterAsset,
+      lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,
     }
   }
