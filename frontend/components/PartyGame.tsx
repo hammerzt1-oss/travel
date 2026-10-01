@@ -67,24 +67,36 @@ function ComponentIcon({
 
 function TouchControls({ onInput }: { onInput: (input: PlayerInput) => void }) {
   const inputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
+  const onInputRef = useRef(onInput)
+  const [pressed, setPressed] = useState<Record<keyof PlayerInput, boolean>>({
+    left: false,
+    right: false,
+    jump: false,
+  })
+
+  useEffect(() => {
+    onInputRef.current = onInput
+  }, [onInput])
 
   const update = (key: keyof PlayerInput, value: boolean) => {
     inputRef.current = { ...inputRef.current, [key]: value }
+    setPressed((current) => ({ ...current, [key]: value }))
     onInput(inputRef.current)
   }
 
   useEffect(() => {
-    const release = () => {
+    const releaseAll = () => {
       inputRef.current = { left: false, right: false, jump: false }
-      onInput(inputRef.current)
+      setPressed({ left: false, right: false, jump: false })
+      onInputRef.current(inputRef.current)
     }
-    window.addEventListener('pointerup', release)
-    window.addEventListener('blur', release)
+    window.addEventListener('blur', releaseAll)
+    document.addEventListener('visibilitychange', releaseAll)
     return () => {
-      window.removeEventListener('pointerup', release)
-      window.removeEventListener('blur', release)
+      window.removeEventListener('blur', releaseAll)
+      document.removeEventListener('visibilitychange', releaseAll)
     }
-  }, [onInput])
+  }, [])
 
   const pressProps = (key: keyof PlayerInput) => ({
     onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -97,21 +109,22 @@ function TouchControls({ onInput }: { onInput: (input: PlayerInput) => void }) {
       update(key, false)
     },
     onPointerCancel: () => update(key, false),
+    onLostPointerCapture: () => update(key, false),
     onContextMenu: (event: React.MouseEvent) => event.preventDefault(),
   })
 
   return (
     <div className="pdzz-touch-controls" aria-label="游戏操作">
       <div className="pdzz-move-control">
-        <button className="pdzz-touch-button pdzz-touch-left" aria-label="向左移动" {...pressProps('left')}>
+        <button className={`pdzz-touch-button pdzz-touch-left ${pressed.left ? 'is-pressed' : ''}`} aria-label="向左移动" aria-pressed={pressed.left} {...pressProps('left')}>
           <img src="/game/assets/pdzz/ui/frames/move_white.png" alt="" aria-hidden="true" />
         </button>
-        <button className="pdzz-touch-button pdzz-touch-right" aria-label="向右移动" {...pressProps('right')}>
+        <button className={`pdzz-touch-button pdzz-touch-right ${pressed.right ? 'is-pressed' : ''}`} aria-label="向右移动" aria-pressed={pressed.right} {...pressProps('right')}>
           <img src="/game/assets/pdzz/ui/frames/move_white.png" alt="" aria-hidden="true" />
         </button>
         <span>移动</span>
       </div>
-      <button className="pdzz-touch-button pdzz-jump-control" aria-label="跳跃" {...pressProps('jump')}>
+      <button className={`pdzz-touch-button pdzz-jump-control ${pressed.jump ? 'is-pressed' : ''}`} aria-label="跳跃" aria-pressed={pressed.jump} {...pressProps('jump')}>
         <img src="/game/assets/pdzz/ui/frames/icon_jump.png" alt="" aria-hidden="true" />
         <span>跳</span>
       </button>
@@ -559,11 +572,9 @@ export default function PartyGame() {
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
-    const interval = window.setInterval(() => send({ type: 'input', input }), 50)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
-      window.clearInterval(interval)
     }
   }, [screen, send])
 
