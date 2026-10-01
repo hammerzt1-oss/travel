@@ -869,7 +869,11 @@ export class GameSimulation {
             velocityY: 0,
             extraHorizontalAirSpeed: 0,
             direction: 1 as const,
-            onGround: false,
+            // Spawn points are authored on the top face of the start
+            // platform. Mark the controller grounded in the first snapshot;
+            // otherwise a tap during the opening frames is rejected before
+            // the first fixed physics tick has a chance to settle it.
+            onGround: true,
             onWall: false,
             wallDirection: 1 as const,
             surfaceMaterial: 'normal' as const,

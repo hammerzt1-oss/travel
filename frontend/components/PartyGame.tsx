@@ -407,7 +407,6 @@ export default function PartyGame() {
   const [connectionState, setConnectionState] = useState<'offline' | 'connecting' | 'online'>('offline')
   const [now, setNow] = useState(() => Date.now())
   const reconnectAttempted = useRef(false)
-  const lastHomeActionAt = useRef(0)
   const pendingGameStateRef = useRef<GameState | null>(null)
   const gameStateFlushTimerRef = useRef<number | null>(null)
   const lastGameStateCommitAt = useRef(0)
@@ -672,13 +671,6 @@ export default function PartyGame() {
     send({ type: 'create_room' })
   }
 
-  const runHomeAction = (action: () => void) => {
-    const now = Date.now()
-    if (now - lastHomeActionAt.current < 600) return
-    lastHomeActionAt.current = now
-    action()
-  }
-
   const joinRoom = () => {
     const normalized = roomInput.trim()
     if (!normalized) {
@@ -789,8 +781,7 @@ export default function PartyGame() {
             <div className="home-actions">
               <button
                 className="primary-button"
-                onTouchEnd={() => runHomeAction(createRoom)}
-                onClick={() => runHomeAction(createRoom)}
+                onClick={createRoom}
               >{connectionState === 'connecting' ? '正在连接…' : '创建房间'}</button>
               <div className="join-line">
                 <input
@@ -805,14 +796,12 @@ export default function PartyGame() {
                 />
                 <button
                   className="secondary-button"
-                  onTouchEnd={() => runHomeAction(joinRoom)}
-                  onClick={() => runHomeAction(joinRoom)}
+                  onClick={joinRoom}
                 >加入房间</button>
               </div>
               <button
                 className="random-join-button"
-                onTouchEnd={() => runHomeAction(randomJoin)}
-                onClick={() => runHomeAction(randomJoin)}
+                onClick={randomJoin}
               >随机加入</button>
             </div>
             <div className="how-to-play">

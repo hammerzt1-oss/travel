@@ -59,6 +59,9 @@ type PlayerTrack = {
     velocityX: number
     velocityY: number
     jumping: boolean
+    grounded: boolean
+    jumpStartedAt: number | null
+    serverAirborne: boolean
     updatedAt: number
     correctionX: number
     correctionY: number
@@ -259,9 +262,15 @@ export class LayaCharacterRenderer {
     }
     const prediction = track?.localPrediction
     if (!player || !prediction || !player.alive || player.finished) return
-    if (player.animationState === 'idle' || player.animationState === 'run') {
+    // The input edge must not wait for the next authoritative animation
+    // packet. On mobile that packet can still say "fall" for one frame after
+    // the feet have landed, which used to swallow a perfectly valid jump.
+    if (prediction.grounded || player.animationState === 'idle' || player.animationState === 'run') {
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity
       prediction.jumping = true
+      prediction.grounded = false
+      prediction.jumpStartedAt = now
+      prediction.serverAirborne = false
       prediction.updatedAt = now
     }
   }
@@ -352,7 +361,43 @@ export class LayaCharacterRenderer {
       prediction.correctionY = this.clampCorrection(errorY)
       prediction.velocityX = prediction.velocityX * 0.65 + sample.velocityX * 0.35
       prediction.velocityY = prediction.velocityY * 0.65 + sample.velocityY * 0.35
-      prediction.jumping = player.animationState === 'jump' || player.animationState === 'fall'
+      const serverGrounded = player.animationState === 'idle' || player.animationState === 'run'
+      const serverAirborne = player.animationState === 'jump' || player.animationState === 'fall'
+      if (serverAirborne) {
+        prediction.grounded = false
+        prediction.jumping = true
+        prediction.serverAirborne = true
+        prediction.jumpStartedAt ??= receivedAt
+      } else if (prediction.serverAirborne) {
+        // The authoritative controller has completed the landing collision.
+        // End the local arc on this packet instead of letting a stale jump
+        // prediction drift through the floor.
+        prediction.grounded = serverGrounded
+        prediction.jumping = false
+        prediction.serverAirborne = false
+        prediction.jumpStartedAt = null
+      } else if (!prediction.jumping) {
+        prediction.grounded = serverGrounded
+        prediction.jumpStartedAt = null
+      } else if (
+        // A tap can release before the first authoritative packet arrives.
+        // Keep the locally-started arc alive for that packet gap; otherwise
+        // the old idle snapshot cancels the jump before it is visible.
+        prediction.jumpStartedAt !== null &&
+        receivedAt - prediction.jumpStartedAt >= 150
+      ) {
+        prediction.grounded = serverGrounded
+        prediction.jumping = false
+        prediction.serverAirborne = false
+        prediction.jumpStartedAt = null
+      }
+      if (serverGrounded && !prediction.jumping) {
+        // Landing is a discrete collision decision. Converge vertical state
+        // immediately instead of carrying a stale local arc through the floor.
+        prediction.y = sample.y
+        prediction.velocityY = 0
+        prediction.correctionY = 0
+      }
       prediction.updatedAt = receivedAt
     }
   }
@@ -364,6 +409,9 @@ export class LayaCharacterRenderer {
       velocityX: sample.velocityX,
       velocityY: sample.velocityY,
       jumping: player.animationState === 'jump' || player.animationState === 'fall',
+      grounded: player.animationState === 'idle' || player.animationState === 'run',
+      jumpStartedAt: null,
+      serverAirborne: player.animationState === 'jump' || player.animationState === 'fall',
       updatedAt: receivedAt,
       correctionX: 0,
       correctionY: 0,
@@ -469,10 +517,12 @@ export class LayaCharacterRenderer {
     instance.skeleton.visible = state.status !== 'BUILDING'
     instance.skeleton.alpha = player.alive || player.finished ? 1 : 0.35
     const serverAnimation = animationForState[player.animationState]
+    const prediction = isLocal ? track.localPrediction : undefined
+    const localAirborne = Boolean(prediction?.jumping) || player.animationState === 'jump' || player.animationState === 'fall'
     const animation = isLocal && player.alive && !player.finished
-      ? this.localInput.jump
-        ? 'jump'
-        : horizontalInput !== 0 && player.animationState !== 'jump' && player.animationState !== 'fall'
+      ? localAirborne
+        ? (prediction && prediction.velocityY < 0 ? 'jump' : 'falldown')
+        : horizontalInput !== 0
           ? 'run'
           : serverAnimation
       : serverAnimation

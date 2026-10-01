@@ -114,6 +114,24 @@ const haystackPlayer = haystackSimulation.players.get('haystack-player')
 assert.ok(haystackPlayer)
 assert.equal(haystackPlayer.x, 328)
 assert.equal(haystackPlayer.y, 1240)
+
+// A jump tap is allowed in the first frame after the countdown. Spawn points
+// are authored on the start platform, so the initial snapshot must already be
+// grounded instead of reporting a transient fall state.
+const openingJumpSimulation = new GameSimulation(
+  1,
+  [{ id: 'opening-jump', slot: 1, label: '棒尼', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const openingJumpPlayer = openingJumpSimulation.players.get('opening-jump')
+assert.ok(openingJumpPlayer)
+assert.equal(openingJumpPlayer.onGround, true)
+openingJumpSimulation.setInput('opening-jump', { left: false, right: false, jump: true })
+openingJumpSimulation.tick(1 / 60)
+assert.equal(openingJumpPlayer.jumpConsumed, true)
+assert.ok(openingJumpPlayer.velocityY < 0)
+
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)
 haystackPlayer.x = 1800
