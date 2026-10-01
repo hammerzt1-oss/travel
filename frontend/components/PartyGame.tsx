@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import * as Phaser from 'phaser'
 import { io, type Socket } from 'socket.io-client'
 import type {
@@ -65,8 +65,13 @@ function ComponentIcon({
   )
 }
 
-function TouchControls({ onInput }: { onInput: (input: PlayerInput) => void }) {
-  const inputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
+function TouchControls({
+  onInput,
+  inputRef,
+}: {
+  onInput: (input: PlayerInput) => void
+  inputRef: MutableRefObject<PlayerInput>
+}) {
   const onInputRef = useRef(onInput)
   const [pressed, setPressed] = useState<Record<keyof PlayerInput, boolean>>({
     left: false,
@@ -183,12 +188,14 @@ function GameCanvas({
   build,
   countdown,
   localPlayerId,
+  localInput,
   onPlace,
 }: {
   state: GameState | null
   build: BuildState | null
   countdown: number | null
   localPlayerId: string | null
+  localInput: PlayerInput
   onPlace: (x: number, y: number) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -207,10 +214,6 @@ function GameCanvas({
 
   useEffect(() => {
     if (!hostRef.current) return
-    const isTouchDevice =
-      window.matchMedia('(pointer: coarse)').matches ||
-      navigator.maxTouchPoints > 0 ||
-      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
     // The APK uses the Laya armature and its raw texture for the playable
     // animal. This is also the authoritative layer on mobile; Phaser remains
     // responsible for the map, traps and camera only.
@@ -237,7 +240,10 @@ function GameCanvas({
       transparent: true,
       backgroundColor: 'transparent',
       render: { antialias: true, pixelArt: false },
-      fps: { target: isTouchDevice ? 30 : 60, limit: isTouchDevice ? 30 : 0, forceSetTimeOut: isTouchDevice },
+      // Keep the visual loop at display refresh rate. The server remains
+      // authoritative at its fixed step; throttling this loop to 30 FPS made
+      // touch input visibly wait for a second render tick on mobile.
+      fps: { target: 60, limit: 0, forceSetTimeOut: false },
       physics: {
         default: 'arcade',
         arcade: { debug: false },
@@ -253,12 +259,13 @@ function GameCanvas({
     // one character render at a different scale or position from another.
     // The Phaser fallback uses the same fixed collider dimensions on every
     // browser, so keep it authoritative on touch-sized screens.
-    void LayaCharacterRenderer.create(hostRef.current, { reducedFrameRate: isTouchDevice }).then((renderer) => {
+    void LayaCharacterRenderer.create(hostRef.current).then((renderer) => {
       if (cancelled) {
         renderer.destroy()
         return
       }
       characterRendererRef.current = renderer
+      renderer.setLocalInput(localPlayerId, localInput)
       renderer.update(state, sceneRef.current)
     })
     return () => {
@@ -274,6 +281,10 @@ function GameCanvas({
     sceneRef.current?.setState(state, localPlayerId, build, countdown)
     characterRendererRef.current?.update(state, sceneRef.current)
   }, [state, build, localPlayerId, countdown])
+
+  useEffect(() => {
+    characterRendererRef.current?.setLocalInput(localPlayerId, localInput)
+  }, [localInput, localPlayerId])
 
   return (
     <div
@@ -375,13 +386,15 @@ export default function PartyGame() {
   const pendingGameStateRef = useRef<GameState | null>(null)
   const gameStateFlushTimerRef = useRef<number | null>(null)
   const lastGameStateCommitAt = useRef(0)
+  const localInputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
+  const [localInput, setLocalInput] = useState<PlayerInput>({ left: false, right: false, jump: false })
   const sessionStorageKey = 'party-platform-session'
 
   const publishGameState = useCallback((next: GameState | null, immediate = false) => {
     pendingGameStateRef.current = next
     const currentTime = performance.now()
     const elapsed = currentTime - lastGameStateCommitAt.current
-    if (immediate || elapsed >= 100) {
+    if (immediate || elapsed >= 50) {
       if (gameStateFlushTimerRef.current !== null) {
         window.clearTimeout(gameStateFlushTimerRef.current)
         gameStateFlushTimerRef.current = null
@@ -395,7 +408,7 @@ export default function PartyGame() {
         gameStateFlushTimerRef.current = null
         lastGameStateCommitAt.current = performance.now()
         setGameState(pendingGameStateRef.current)
-      }, Math.max(0, 100 - elapsed))
+      }, Math.max(0, 50 - elapsed))
     }
   }, [])
 
@@ -408,14 +421,22 @@ export default function PartyGame() {
     socket.emit('client_message', message)
   }, [])
 
+  const updateLocalInput = useCallback((input: PlayerInput) => {
+    localInputRef.current = input
+    setLocalInput(input)
+    send({ type: 'input', input })
+  }, [send])
+
   const connect = useCallback(() => {
     if (socketRef.current) return socketRef.current
     setConnectionState('connecting')
     const socket = io(SERVER_URL, {
-      // Keep the public game path on HTTP polling. It works in mobile
-      // browsers and embedded webviews where WebSocket upgrades are blocked.
-      transports: ['polling'],
-      upgrade: false,
+      // WebSocket removes the extra request/response turn that polling adds
+      // to every input. Socket.IO still falls back to polling on restrictive
+      // mobile networks.
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      tryAllTransports: true,
       forceNew: true,
       timeout: 20000,
       reconnectionAttempts: 5,
@@ -540,7 +561,18 @@ export default function PartyGame() {
 
   useEffect(() => {
     if (screen !== 'game') return
-    const input: PlayerInput = { left: false, right: false, jump: false }
+    // Keep the authoritative input alive while a finger or key is held. This
+    // also recovers quickly after a short mobile network stall without adding
+    // React renders to the hot path.
+    const timer = window.setInterval(() => {
+      const socket = socketRef.current
+      if (socket?.connected) socket.emit('client_message', { type: 'input', input: localInputRef.current })
+    }, 50)
+    return () => window.clearInterval(timer)
+  }, [screen])
+
+  useEffect(() => {
+    if (screen !== 'game') return
     const keyMap: Record<string, keyof PlayerInput> = {
       ArrowLeft: 'left',
       KeyA: 'left',
@@ -560,23 +592,37 @@ export default function PartyGame() {
       const key = keyMap[event.key] || keyMap[event.code]
       if (!key) return
       event.preventDefault()
-      input[key] = true
-      send({ type: 'input', input: { ...input } })
+      if (localInputRef.current[key]) return
+      updateLocalInput({ ...localInputRef.current, [key]: true })
     }
     const onKeyUp = (event: KeyboardEvent) => {
       const key = keyMap[event.key] || keyMap[event.code]
       if (!key) return
       event.preventDefault()
-      input[key] = false
-      send({ type: 'input', input: { ...input } })
+      if (!localInputRef.current[key]) return
+      updateLocalInput({ ...localInputRef.current, [key]: false })
+    }
+    const releaseAll = () => {
+      if (!Object.values(localInputRef.current).some(Boolean)) return
+      updateLocalInput({ left: false, right: false, jump: false })
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', releaseAll)
+    document.addEventListener('visibilitychange', releaseAll)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', releaseAll)
+      document.removeEventListener('visibilitychange', releaseAll)
     }
-  }, [screen, send])
+  }, [screen, updateLocalInput])
+
+  useEffect(() => {
+    if (screen === 'game') return
+    localInputRef.current = { left: false, right: false, jump: false }
+    setLocalInput({ left: false, right: false, jump: false })
+  }, [screen])
 
   const resetSocketForNewSession = () => {
     socketRef.current?.disconnect()
@@ -679,6 +725,7 @@ export default function PartyGame() {
             build={screen === 'build' ? build : null}
             countdown={screen === 'game' ? countdown : null}
             localPlayerId={localPlayerId}
+            localInput={localInput}
             onPlace={(x, y) => send({ type: 'place_trap', x, y, rotation: pendingPlacement?.rotation ?? 0 })}
           />
         </div>
@@ -970,7 +1017,7 @@ export default function PartyGame() {
           onDragStart={(event) => event.preventDefault()}
         >
           <div className="game-frame pdzz-game-frame">
-            <TouchControls onInput={(input) => send({ type: 'input', input })} />
+            <TouchControls inputRef={localInputRef} onInput={updateLocalInput} />
           </div>
         </section>
       )}

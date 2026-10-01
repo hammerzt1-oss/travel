@@ -1,5 +1,5 @@
-import { PDZZ_CHARACTERS } from '../../shared/pdzzConfig'
-import type { GameState, PlayerSnapshot } from '../../shared/gameProtocol'
+import { PDZZ_CHARACTERS, PDZZ_PHYSICS } from '../../shared/pdzzConfig'
+import type { GameState, PlayerInput, PlayerSnapshot } from '../../shared/gameProtocol'
 import type { PartyScene } from './PartyScene'
 
 type LayaRuntime = {
@@ -53,6 +53,14 @@ type PositionSample = {
 type PlayerTrack = {
   samples: PositionSample[]
   snap: boolean
+  localPrediction?: {
+    x: number
+    y: number
+    velocityX: number
+    velocityY: number
+    jumping: boolean
+    updatedAt: number
+  }
 }
 
 declare global {
@@ -71,7 +79,8 @@ const CHARACTER_INTERPOLATION_DELAY_MS = 70
 const CHARACTER_MAX_EXTRAPOLATION_MS = 80
 const CHARACTER_MAX_HISTORY = 8
 const CHARACTER_ART_HEIGHT = 60
-const CHARACTER_RENDER_INTERVAL_MS = 1000 / 30
+const CHARACTER_RENDER_INTERVAL_MS = 1000 / 60
+const LOCAL_PREDICTION_MAX_DT_MS = 120
 const animationForState: Record<PlayerSnapshot['animationState'], string> = {
   idle: 'idle',
   run: 'run',
@@ -146,15 +155,20 @@ export class LayaCharacterRenderer {
   private readonly canvasTransformObserver: MutationObserver | null
   private latestState: GameState | null = null
   private latestScene: PartyScene | null = null
+  private localPlayerId: string | null = null
+  private localInput: PlayerInput = { left: false, right: false, jump: false }
   private frameHandle: number | null = null
   private lastRenderAt = 0
   private disposed = false
 
-  private constructor(host: HTMLElement, runtime: LayaRuntime, reducedFrameRate: boolean) {
+  private constructor(host: HTMLElement, runtime: LayaRuntime) {
     this.host = host
     this.runtime = runtime
     if (!runtime.stage || !runtime.Render?.canvas) runtime.init(PDZZ_VIEWPORT_WIDTH, PDZZ_VIEWPORT_HEIGHT)
-    if (reducedFrameRate && runtime.stage) runtime.stage.frameRate = 'slow'
+    // The character transform loop is already frame-budgeted below. Keep the
+    // Laya stage on its fast path so mobile browsers do not add a second 30 FPS
+    // ceiling on top of the Phaser canvas.
+    if (runtime.stage) runtime.stage.frameRate = 'fast'
     const canvas = runtime.Render.canvas
     // Phaser and Laya share the same portrait surface. Keep the backing
     // canvas in the game's logical coordinate system; relying on a mobile
@@ -197,11 +211,11 @@ export class LayaCharacterRenderer {
     this.frameHandle = window.requestAnimationFrame(this.renderFrame)
   }
 
-  static async create(host: HTMLElement, options: { reducedFrameRate?: boolean } = {}) {
+  static async create(host: HTMLElement) {
     const runtime = await loadRuntime()
     if (!runtime.stage || !runtime.Render?.canvas) runtime.init(PDZZ_VIEWPORT_WIDTH, PDZZ_VIEWPORT_HEIGHT)
     console.info('[pdzz] Laya character renderer ready')
-    return new LayaCharacterRenderer(host, runtime, options.reducedFrameRate ?? false)
+    return new LayaCharacterRenderer(host, runtime)
   }
 
   update(state: GameState | null, scene: PartyScene | null) {
@@ -224,6 +238,29 @@ export class LayaCharacterRenderer {
     for (const player of state.players) {
       this.recordSample(player, receivedAt)
       this.updatePlayer(player, state, scene)
+    }
+  }
+
+  setLocalInput(playerId: string | null, input: PlayerInput) {
+    if (this.disposed) return
+    const now = performance.now()
+    this.advanceLocalPrediction(now)
+    const previous = this.localInput
+    this.localPlayerId = playerId
+    this.localInput = { ...input }
+    if (!playerId || !input.jump || previous.jump) return
+    const player = this.latestPlayers.get(playerId)
+    const track = this.tracks.get(playerId)
+    if (track && !track.localPrediction) {
+      const latest = track.samples[track.samples.length - 1]
+      if (latest && player) track.localPrediction = this.createLocalPrediction(latest, player, now)
+    }
+    const prediction = track?.localPrediction
+    if (!player || !prediction || !player.alive || player.finished) return
+    if (player.animationState === 'idle' || player.animationState === 'run') {
+      prediction.velocityY = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity
+      prediction.jumping = true
+      prediction.updatedAt = now
     }
   }
 
@@ -272,7 +309,9 @@ export class LayaCharacterRenderer {
       velocityY: player.velocityY,
     }
     if (!previous) {
-      this.tracks.set(player.id, { samples: [sample], snap: true })
+      const track: PlayerTrack = { samples: [sample], snap: true }
+      if (player.id === this.localPlayerId) track.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+      this.tracks.set(player.id, track)
       return
     }
     const last = previous.samples[previous.samples.length - 1]
@@ -282,12 +321,67 @@ export class LayaCharacterRenderer {
     previous.snap = moved > 260 || player.animationState === 'death' || !player.alive || player.finished
     previous.samples.push(sample)
     if (previous.samples.length > CHARACTER_MAX_HISTORY) previous.samples.shift()
+    if (player.id === this.localPlayerId) {
+      previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+    }
+  }
+
+  private createLocalPrediction(sample: PositionSample, player: PlayerSnapshot, receivedAt: number) {
+    return {
+      x: sample.x,
+      y: sample.y,
+      velocityX: sample.velocityX,
+      velocityY: sample.velocityY,
+      jumping: player.animationState === 'jump' || player.animationState === 'fall',
+      updatedAt: receivedAt,
+    }
+  }
+
+  private advanceLocalPrediction(now: number) {
+    if (!this.localPlayerId) return
+    const track = this.tracks.get(this.localPlayerId)
+    const player = this.latestPlayers.get(this.localPlayerId)
+    const prediction = track?.localPrediction
+    if (!track || !player || !prediction || !player.alive || player.finished) return
+    const elapsedMs = Math.max(0, Math.min(LOCAL_PREDICTION_MAX_DT_MS, now - prediction.updatedAt))
+    if (elapsedMs <= 0) return
+    const dt = elapsedMs / 1000
+    const horizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
+    const targetVelocity = horizontal * PDZZ_PHYSICS.player.normalHorizontalSpeed
+    const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
+    if (horizontal !== 0) {
+      prediction.velocityX = this.approach(prediction.velocityX, targetVelocity, acceleration)
+    } else {
+      prediction.velocityX = 0
+    }
+    prediction.x += prediction.velocityX * dt
+    if (prediction.jumping) {
+      const gravity = this.localInput.jump
+        ? PDZZ_PHYSICS.playerDerived.gravity
+        : PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.jumpUpGravityVariation
+      prediction.velocityY = Math.min(
+        PDZZ_PHYSICS.player.maxFallSpeed,
+        prediction.velocityY + gravity * dt,
+      )
+      prediction.y += prediction.velocityY * dt
+    }
+    prediction.updatedAt = now
+  }
+
+  private approach(value: number, target: number, amount: number) {
+    if (value < target) return Math.min(value + amount, target)
+    if (value > target) return Math.max(value - amount, target)
+    return target
   }
 
   private interpolatedPosition(track: PlayerTrack, now: number) {
     const samples = track.samples
     const latest = samples[samples.length - 1]
     if (!latest) return { x: 0, y: 0 }
+    if (track === this.tracks.get(this.localPlayerId ?? '') && track.localPrediction) {
+      this.advanceLocalPrediction(now)
+      return { x: track.localPrediction.x, y: track.localPrediction.y }
+    }
     if (track.snap || samples.length === 1) {
       track.snap = false
       return { x: latest.x, y: latest.y }
@@ -321,11 +415,25 @@ export class LayaCharacterRenderer {
     const track = this.tracks.get(playerId)
     if (!player || !instance || !track) return
     const worldPosition = this.interpolatedPosition(track, now)
-    const displayPlayer = { ...player, x: worldPosition.x, y: worldPosition.y }
+    const isLocal = playerId === this.localPlayerId
+    const horizontalInput = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
+    const displayPlayer = {
+      ...player,
+      x: worldPosition.x,
+      y: worldPosition.y,
+      direction: isLocal && horizontalInput !== 0 ? horizontalInput as -1 | 1 : player.direction,
+    }
     const position = scene.playerScreenPosition(displayPlayer, this.host.clientWidth, this.host.clientHeight)
     instance.skeleton.visible = state.status !== 'BUILDING'
     instance.skeleton.alpha = player.alive || player.finished ? 1 : 0.35
-    const animation = animationForState[player.animationState]
+    const serverAnimation = animationForState[player.animationState]
+    const animation = isLocal && player.alive && !player.finished
+      ? this.localInput.jump
+        ? 'jump'
+        : horizontalInput !== 0 && player.animationState !== 'jump' && player.animationState !== 'fall'
+          ? 'run'
+          : serverAnimation
+      : serverAnimation
     if (instance.animation !== animation) {
       const next = instance.animations.has(animation) ? animation : instance.animations.has('idle') ? 'idle' : null
       if (next) {
