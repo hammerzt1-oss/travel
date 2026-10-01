@@ -143,6 +143,7 @@ export class LayaCharacterRenderer {
   private readonly pending = new Map<string, Promise<void>>()
   private readonly tracks = new Map<string, PlayerTrack>()
   private readonly latestPlayers = new Map<string, PlayerSnapshot>()
+  private readonly canvasTransformObserver: MutationObserver | null
   private latestState: GameState | null = null
   private latestScene: PartyScene | null = null
   private frameHandle: number | null = null
@@ -169,6 +170,23 @@ export class LayaCharacterRenderer {
     canvas.style.pointerEvents = 'none'
     canvas.style.background = 'transparent'
     canvas.style.zIndex = '3'
+    // MiniAdpter writes a mobile stage matrix back to the canvas whenever the
+    // viewport changes. The Phaser surface already owns the responsive fit,
+    // so that second transform must remain disabled at runtime as well as in
+    // CSS; otherwise characters can drift toward the top-left after rotation
+    // or browser chrome changes.
+    const lockCanvasTransform = () => {
+      canvas.style.setProperty('transform', 'none', 'important')
+      canvas.style.setProperty('transform-origin', '0 0', 'important')
+    }
+    lockCanvasTransform()
+    this.canvasTransformObserver = typeof MutationObserver === 'undefined'
+      ? null
+      : new MutationObserver(lockCanvasTransform)
+    this.canvasTransformObserver?.observe(canvas, {
+      attributes: true,
+      attributeFilter: ['style'],
+    })
     canvas.classList.add('pdzz-laya-character-canvas')
     canvas.draggable = false
     canvas.setAttribute('aria-hidden', 'true')
@@ -212,6 +230,7 @@ export class LayaCharacterRenderer {
   destroy() {
     if (this.disposed) return
     this.disposed = true
+    this.canvasTransformObserver?.disconnect()
     if (this.frameHandle !== null) window.cancelAnimationFrame(this.frameHandle)
     this.frameHandle = null
     for (const instance of this.instances.values()) instance.skeleton.destroy(true)
