@@ -155,6 +155,13 @@ export class LayaCharacterRenderer {
     if (!runtime.stage || !runtime.Render?.canvas) runtime.init(PDZZ_VIEWPORT_WIDTH, PDZZ_VIEWPORT_HEIGHT)
     if (reducedFrameRate && runtime.stage) runtime.stage.frameRate = 'slow'
     const canvas = runtime.Render.canvas
+    // Phaser and Laya share the same portrait surface. Keep the backing
+    // canvas in the game's logical coordinate system; relying on a mobile
+    // browser's first canvas size makes the armatures render at the wrong
+    // scale or near the top edge after a viewport change.
+    if (canvas.width !== PDZZ_VIEWPORT_WIDTH) canvas.width = PDZZ_VIEWPORT_WIDTH
+    if (canvas.height !== PDZZ_VIEWPORT_HEIGHT) canvas.height = PDZZ_VIEWPORT_HEIGHT
+    canvas.dataset.pdzzViewport = `${PDZZ_VIEWPORT_WIDTH}x${PDZZ_VIEWPORT_HEIGHT}`
     canvas.style.position = 'absolute'
     canvas.style.inset = '0'
     canvas.style.width = '100%'

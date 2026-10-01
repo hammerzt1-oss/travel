@@ -693,6 +693,18 @@ input:focus { border-color: var(--coral); }
   user-select: none;
   -webkit-user-drag: none;
 }
+.pdzz-persistent-game-canvas img,
+.pdzz-game-screen img,
+.pdzz-build-screen img {
+  /* Images are visual assets only. Let the surrounding button/container own
+     the pointer so Android browsers cannot open their image long-press menu. */
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
 .pdzz-map-fallback {
   position: absolute;
   z-index: 0;
@@ -760,6 +772,9 @@ input:focus { border-color: var(--coral); }
   min-height: 0;
   color: #fff;
   pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .pdzz-move-control, .pdzz-jump-control {
   position: relative;
@@ -789,6 +804,9 @@ input:focus { border-color: var(--coral); }
   color: #fff;
   background: transparent;
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .pdzz-touch-left { left: 0; }
 .pdzz-touch-right { right: 0; }

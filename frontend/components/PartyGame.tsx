@@ -830,7 +830,11 @@ export default function PartyGame() {
       )}
 
       {screen === 'build' && (
-        <section className="game-screen build-screen pdzz-build-screen">
+        <section
+          className="game-screen build-screen pdzz-build-screen"
+          onContextMenu={(event) => event.preventDefault()}
+          onDragStart={(event) => event.preventDefault()}
+        >
           <div className="game-hud build-hud">
             <div>
               <p className="eyebrow">ROUND {room?.round ?? 1} / BUILD</p>
@@ -949,7 +953,11 @@ export default function PartyGame() {
       )}
 
       {screen === 'game' && (
-        <section className="game-screen pdzz-game-screen">
+        <section
+          className="game-screen pdzz-game-screen"
+          onContextMenu={(event) => event.preventDefault()}
+          onDragStart={(event) => event.preventDefault()}
+        >
           <div className="game-frame pdzz-game-frame">
             <TouchControls onInput={(input) => send({ type: 'input', input })} />
           </div>
