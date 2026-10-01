@@ -87,11 +87,18 @@ type PlayerRenderTarget = {
   snap: boolean
 }
 
+type LocalRenderPosition = {
+  playerId: string
+  x: number
+  y: number
+}
+
 export class PartyScene extends Phaser.Scene {
   private currentState: GameState | null = null
   private currentBuild: BuildState | null = null
   private currentCountdown: number | null = null
   private localPlayerId: string | null = null
+  private localRenderPosition: LocalRenderPosition | null = null
   private callbacks: SceneCallbacks
   // Keep a cropped single-pose fallback for camera following and for browsers
   // where the Laya WebGL canvas is delayed. Never draw the full extracted
@@ -414,8 +421,15 @@ export class PartyScene extends Phaser.Scene {
     this.currentBuild = build
     this.localPlayerId = localPlayerId
     this.currentCountdown = countdown
+    if (!state || state.status !== 'PLAYING') this.localRenderPosition = null
     if (!state) return
     this.renderState()
+  }
+
+  setLocalRenderPosition(playerId: string, x: number, y: number) {
+    if (playerId !== this.localPlayerId || !this.currentState || this.currentState.status !== 'PLAYING') return
+    this.localRenderPosition = { playerId, x, y }
+    this.updateCamera(this.currentState)
   }
 
   private renderState() {
@@ -1257,7 +1271,10 @@ export class PartyScene extends Phaser.Scene {
     const maxScrollX = Math.max(0, state.level.width - camera.width / camera.zoom)
     const localSprite = this.players.get(local.id)
     const localTarget = this.playerTargets.get(local.id)
-    const localWorldX = localSprite?.x ?? localTarget?.x ?? local.x + PLAYER_COLLIDER_WIDTH / 2
+    const predicted = this.localRenderPosition?.playerId === local.id ? this.localRenderPosition : null
+    const localWorldX = predicted
+      ? predicted.x + PLAYER_COLLIDER_WIDTH / 2
+      : localSprite?.x ?? localTarget?.x ?? local.x + PLAYER_COLLIDER_WIDTH / 2
     const targetX = localWorldX - camera.width / (2 * camera.zoom)
     const scrollX = Phaser.Math.Clamp(targetX, 0, maxScrollX)
     // The APK keeps the haystack race on a fixed vertical track. The player
@@ -1268,6 +1285,14 @@ export class PartyScene extends Phaser.Scene {
       // Keep the translated view-bounds top fixed so the grass line does not
       // drift vertically while the player runs and jumps.
       camera.setScroll(scrollX, HAYSTACK_CAMERA_Y)
+    } else if (predicted) {
+      // Laya supplies the same 60 FPS predicted position used to draw the
+      // local character. Keep the camera on that position instead of asking
+      // Phaser to follow a hidden, 30 Hz fallback sprite.
+      camera.stopFollow()
+      const maxScrollY = Math.max(0, state.level.height - camera.height / camera.zoom)
+      const targetY = predicted.y + PLAYER_COLLIDER_HEIGHT / 2 - camera.height / (2 * camera.zoom)
+      camera.setScroll(scrollX, Phaser.Math.Clamp(targetY, 0, maxScrollY))
     } else {
       if (localSprite) {
         camera.startFollow(localSprite, true, 0.12, 0.12)

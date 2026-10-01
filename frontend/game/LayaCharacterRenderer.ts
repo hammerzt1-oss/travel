@@ -345,8 +345,11 @@ export class LayaCharacterRenderer {
         previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
         return
       }
-      prediction.correctionX = this.clampCorrection(prediction.correctionX + errorX)
-      prediction.correctionY = this.clampCorrection(prediction.correctionY + errorY)
+      // Reconciliation is a target, not an accumulator. Adding the new
+      // server error to the previous correction makes a healthy prediction
+      // overshoot, then reverse direction on the next packet.
+      prediction.correctionX = this.clampCorrection(errorX)
+      prediction.correctionY = this.clampCorrection(errorY)
       prediction.velocityX = prediction.velocityX * 0.65 + sample.velocityX * 0.35
       prediction.velocityY = prediction.velocityY * 0.65 + sample.velocityY * 0.35
       prediction.jumping = player.animationState === 'jump' || player.animationState === 'fall'
@@ -488,7 +491,7 @@ export class LayaCharacterRenderer {
     // different pose box while an animation is playing, which changes the
     // character's skin size and makes the animal jump or appear duplicated.
     const baseScale = Math.min(position.zoom, 1) * instance.artScale
-    const signedScaleX = baseScale * (player.direction < 0 ? -1 : 1)
+    const signedScaleX = baseScale * (displayPlayer.direction < 0 ? -1 : 1)
     const bounds = instance.bounds
     if (bounds && bounds.height > 0) {
       instance.skeleton.x = position.x - (bounds.x + bounds.width / 2) * signedScaleX
@@ -508,6 +511,15 @@ export class LayaCharacterRenderer {
       (this.lastRenderAt === 0 || now - this.lastRenderAt >= CHARACTER_RENDER_INTERVAL_MS)
     ) {
       this.lastRenderAt = now
+      const localPlayer = this.latestPlayers.get(this.localPlayerId ?? '')
+      const localTrack = this.tracks.get(this.localPlayerId ?? '')
+      if (localPlayer && localTrack) {
+        const localPosition = this.interpolatedPosition(localTrack, now)
+        // The Phaser map and the Laya character must use the same predicted
+        // world position. Otherwise the character is rendered at 60 FPS while
+        // the camera jumps between 30 Hz authoritative samples.
+        this.latestScene.setLocalRenderPosition(localPlayer.id, localPosition.x, localPosition.y)
+      }
       for (const player of this.latestState.players) {
         this.renderPlayer(player.id, this.latestState, this.latestScene, now)
       }
