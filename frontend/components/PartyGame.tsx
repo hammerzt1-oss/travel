@@ -68,9 +68,11 @@ function ComponentIcon({
 function TouchControls({
   onInput,
   inputRef,
+  disabled = false,
 }: {
   onInput: (input: PlayerInput) => void
   inputRef: MutableRefObject<PlayerInput>
+  disabled?: boolean
 }) {
   const onInputRef = useRef(onInput)
   const [pressed, setPressed] = useState<Record<keyof PlayerInput, boolean>>({
@@ -82,6 +84,12 @@ function TouchControls({
   useEffect(() => {
     onInputRef.current = onInput
   }, [onInput])
+
+  useEffect(() => {
+    if (!disabled) return
+    inputRef.current = { left: false, right: false, jump: false }
+    setPressed({ left: false, right: false, jump: false })
+  }, [disabled, inputRef])
 
   const update = (key: keyof PlayerInput, value: boolean) => {
     inputRef.current = { ...inputRef.current, [key]: value }
@@ -105,6 +113,7 @@ function TouchControls({
 
   const pressProps = (key: keyof PlayerInput) => ({
     onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (disabled) return
       event.preventDefault()
       event.currentTarget.setPointerCapture(event.pointerId)
       update(key, true)
@@ -121,15 +130,15 @@ function TouchControls({
   return (
     <div className="pdzz-touch-controls" aria-label="游戏操作">
       <div className="pdzz-move-control">
-        <button className={`pdzz-touch-button pdzz-touch-left ${pressed.left ? 'is-pressed' : ''}`} aria-label="向左移动" aria-pressed={pressed.left} {...pressProps('left')}>
+        <button disabled={disabled} className={`pdzz-touch-button pdzz-touch-left ${pressed.left ? 'is-pressed' : ''}`} aria-label="向左移动" aria-pressed={pressed.left} {...pressProps('left')}>
           <img src="/game/assets/pdzz/ui/frames/move_white.png" alt="" aria-hidden="true" />
         </button>
-        <button className={`pdzz-touch-button pdzz-touch-right ${pressed.right ? 'is-pressed' : ''}`} aria-label="向右移动" aria-pressed={pressed.right} {...pressProps('right')}>
+        <button disabled={disabled} className={`pdzz-touch-button pdzz-touch-right ${pressed.right ? 'is-pressed' : ''}`} aria-label="向右移动" aria-pressed={pressed.right} {...pressProps('right')}>
           <img src="/game/assets/pdzz/ui/frames/move_white.png" alt="" aria-hidden="true" />
         </button>
         <span>移动</span>
       </div>
-      <button className={`pdzz-touch-button pdzz-jump-control ${pressed.jump ? 'is-pressed' : ''}`} aria-label="跳跃" aria-pressed={pressed.jump} {...pressProps('jump')}>
+      <button disabled={disabled} className={`pdzz-touch-button pdzz-jump-control ${pressed.jump ? 'is-pressed' : ''}`} aria-label="跳跃" aria-pressed={pressed.jump} {...pressProps('jump')}>
         <img src="/game/assets/pdzz/ui/frames/icon_jump.png" alt="" aria-hidden="true" />
         <span>跳</span>
       </button>
@@ -296,6 +305,12 @@ function GameCanvas({
       onContextMenu={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
     >
+      {(build || state?.status === 'COUNTDOWN') && (
+        <div className="game-loading" aria-live="polite">
+          <span className="game-loading-spinner" aria-hidden="true" />
+          <strong>加载中...</strong>
+        </div>
+      )}
       <MapFallbackLayer state={state} hidden={mapReady} />
     </div>
   )
@@ -388,6 +403,8 @@ export default function PartyGame() {
   const lastGameStateCommitAt = useRef(0)
   const localInputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
   const [localInput, setLocalInput] = useState<PlayerInput>({ left: false, right: false, jump: false })
+  const [nameDraft, setNameDraft] = useState('')
+  const nameDraftPlayerRef = useRef<string | null>(null)
   const sessionStorageKey = 'party-platform-session'
 
   const publishGameState = useCallback((next: GameState | null, immediate = false) => {
@@ -560,7 +577,7 @@ export default function PartyGame() {
   }, [])
 
   useEffect(() => {
-    if (screen !== 'game') return
+    if (screen !== 'game' || gameState?.status !== 'PLAYING') return
     // Keep the authoritative input alive while a finger or key is held. This
     // also recovers quickly after a short mobile network stall without adding
     // React renders to the hot path.
@@ -569,10 +586,10 @@ export default function PartyGame() {
       if (socket?.connected) socket.emit('client_message', { type: 'input', input: localInputRef.current })
     }, 50)
     return () => window.clearInterval(timer)
-  }, [screen])
+  }, [screen, gameState?.status])
 
   useEffect(() => {
-    if (screen !== 'game') return
+    if (screen !== 'game' || gameState?.status !== 'PLAYING') return
     const keyMap: Record<string, keyof PlayerInput> = {
       ArrowLeft: 'left',
       KeyA: 'left',
@@ -616,13 +633,13 @@ export default function PartyGame() {
       window.removeEventListener('blur', releaseAll)
       document.removeEventListener('visibilitychange', releaseAll)
     }
-  }, [screen, updateLocalInput])
+  }, [screen, gameState?.status, updateLocalInput])
 
   useEffect(() => {
-    if (screen === 'game') return
+    if (screen === 'game' && gameState?.status === 'PLAYING') return
     localInputRef.current = { left: false, right: false, jump: false }
     setLocalInput({ left: false, right: false, jump: false })
-  }, [screen])
+  }, [screen, gameState?.status])
 
   const resetSocketForNewSession = () => {
     socketRef.current?.disconnect()
@@ -686,6 +703,22 @@ export default function PartyGame() {
     () => room?.players.find((player) => player.id === localPlayerId) ?? null,
     [room?.players, localPlayerId],
   )
+  useEffect(() => {
+    if (!localPlayer || nameDraftPlayerRef.current === localPlayer.id) return
+    nameDraftPlayerRef.current = localPlayer.id
+    setNameDraft(localPlayer.label)
+  }, [localPlayer])
+
+  const saveName = () => {
+    const name = nameDraft.replace(/\s+/g, ' ').trim()
+    if (!name || Array.from(name).length > 16) {
+      setError('名字需要为 1 到 16 个字符')
+      return
+    }
+    setNameDraft(name)
+    send({ type: 'set_name', name })
+  }
+
   const isHost = Boolean(room && localPlayerId && room.hostId === localPlayerId)
   const canStart = Boolean(room && room.players.length >= 1 && room.players.length <= 4 && room.players.every((player) => player.ready && player.connected))
   const build = room?.buildState ?? null
@@ -806,6 +839,21 @@ export default function PartyGame() {
               aria-label="复制房间号"
             >⧉</button>
           </div>
+          <div className="name-editor">
+            <label htmlFor="player-name">我的名字</label>
+            <input
+              id="player-name"
+              value={nameDraft}
+              maxLength={16}
+              onChange={(event) => setNameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') saveName()
+              }}
+              placeholder="输入你的名字"
+              aria-label="我的名字"
+            />
+            <button className="secondary-button name-save-button" onClick={saveName}>保存</button>
+          </div>
           <div className="map-picker">
             <div className="map-picker-heading">
               <div>
@@ -875,9 +923,11 @@ export default function PartyGame() {
             })}
           </div>
           <div className="lobby-footer">
-            <button className="secondary-button" onClick={() => send({ type: 'ready' })}>
-              {localPlayer?.ready ? '取消准备' : '准备好了'}
-            </button>
+            {!isHost && (
+              <button className="secondary-button" onClick={() => send({ type: 'ready' })}>
+                {localPlayer?.ready ? '取消准备' : '准备好了'}
+              </button>
+            )}
             {isHost && (
               <button className="primary-button" disabled={!canStart} onClick={() => send({ type: 'start_game' })}>
                 {canStart ? '开始游戏' : '等待玩家准备'}
@@ -1017,7 +1067,11 @@ export default function PartyGame() {
           onDragStart={(event) => event.preventDefault()}
         >
           <div className="game-frame pdzz-game-frame">
-            <TouchControls inputRef={localInputRef} onInput={updateLocalInput} />
+            <TouchControls
+              inputRef={localInputRef}
+              onInput={updateLocalInput}
+              disabled={gameState?.status !== 'PLAYING'}
+            />
           </div>
         </section>
       )}

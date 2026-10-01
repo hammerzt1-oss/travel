@@ -301,6 +301,16 @@ input:focus { border-color: var(--coral); }
 .room-code-panel span { color: rgba(24, 52, 58, 0.62); font-size: 13px; }
 .room-code-panel strong { font-size: 28px; letter-spacing: 4px; }
 .copy-button { width: 34px; height: 34px; margin-left: auto; color: var(--ink); background: var(--mustard); }
+.name-editor {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.name-editor label { color: rgba(24, 52, 58, 0.68); font-size: 13px; font-weight: 900; }
+.name-editor input { min-width: 0; padding: 10px 12px; }
+.name-save-button { padding: 10px 14px; }
 .map-picker {
   margin-bottom: 18px;
   padding: 16px;
@@ -635,6 +645,29 @@ input:focus { border-color: var(--coral); }
 .round-badge { padding: 7px 11px; border: 2px solid var(--ink); border-radius: 7px; background: var(--mustard); font-size: 12px; font-weight: 900; letter-spacing: 1px; }
 .game-frame { position: relative; flex: 1 1 auto; min-height: 0; height: calc(100vh - 120px); border: 3px solid var(--ink); border-radius: 12px; overflow: hidden; background: var(--mint); box-shadow: 8px 8px 0 rgba(24, 52, 58, 0.16); }
 .game-canvas { width: 100%; height: 100%; min-height: 0; }
+.game-loading {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: #fff;
+  background: rgba(22, 32, 34, .34);
+  pointer-events: none;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .45);
+}
+.game-loading strong { font-size: 18px; }
+.game-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 4px solid rgba(255, 255, 255, .34);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pdzz-spin 760ms linear infinite;
+}
+@keyframes pdzz-spin { to { transform: rotate(360deg); } }
 .pdzz-game-screen {
   width: 100%;
   height: 100vh;
@@ -987,6 +1020,8 @@ input:focus { border-color: var(--coral); }
   .platform-one { bottom: 120px; left: 40px; width: 120px; }
   .platform-two { bottom: 180px; right: 32px; width: 110px; }
   .player-grid { grid-template-columns: 1fr; }
+  .name-editor { grid-template-columns: 1fr auto; }
+  .name-editor label { grid-column: 1 / -1; }
   .map-choice-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lobby-screen, .result-screen { width: min(100% - 28px, 820px); padding: 32px 0; }
   .hud-player { min-width: 0; font-size: 11px; }

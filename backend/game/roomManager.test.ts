@@ -24,6 +24,15 @@ const host = manager.handle('socket-host', { type: 'create_room' })
 assert.ok(host)
 assert.match(host.roomId, /^\d{4}$/)
 
+const createdState = lastRoomState(host.roomId)
+assert.ok(createdState)
+assert.equal(createdState.state.players[0]?.ready, true)
+
+manager.handle('socket-host', { type: 'set_name', name: '房主昵称' })
+const renamedState = lastRoomState(host.roomId)
+assert.ok(renamedState)
+assert.equal(renamedState.state.players[0]?.label, '房主昵称')
+
 manager.handle('socket-host', { type: 'ready' })
 const readyState = lastRoomState(host.roomId)
 assert.ok(readyState)
@@ -56,3 +65,56 @@ const invalidRoom = manager.handle('socket-invalid', {
 assert.equal(invalidRoom, null)
 
 console.log('room manager tests passed')
+
+const placementEvents: RoomEvent[] = []
+const placementManager = new RoomManager((event) => placementEvents.push(event))
+const placementHost = placementManager.handle('placement-host', { type: 'create_room' })
+if (!placementHost) throw new Error('placement room was not created')
+const placementHostSession = placementHost
+const placementGuest = placementManager.handle('placement-guest', { type: 'join_room', roomId: placementHostSession.roomId })
+if (!placementGuest) throw new Error('placement guest did not join')
+placementManager.handle('placement-guest', { type: 'ready' })
+placementManager.handle('placement-host', { type: 'start_game' })
+
+function placementRoomState() {
+  for (let index = placementEvents.length - 1; index >= 0; index -= 1) {
+    const event = placementEvents[index]
+    if (event.type === 'room_state' && event.roomId === placementHostSession.roomId) return event.state
+  }
+  return undefined
+}
+
+let placementState = placementRoomState()
+assert.equal(placementState?.status, 'BUILDING')
+const firstOption = placementState?.buildState?.options[0]
+assert.ok(firstOption)
+placementManager.handle('placement-host', { type: 'select_trap', trapId: firstOption.id })
+placementState = placementRoomState()
+const firstPending = placementState?.buildState?.pendingPlacements.find((item) => item.playerId === placementHostSession.playerId)
+assert.ok(firstPending)
+placementManager.handle('placement-host', {
+  type: 'place_trap',
+  x: firstPending.x,
+  y: firstPending.y,
+  rotation: firstPending.rotation,
+})
+placementManager.handle('placement-host', { type: 'confirm_build' })
+
+placementState = placementRoomState()
+const secondOption = placementState?.buildState?.options.find((option) => !option.claimedBy)
+assert.ok(secondOption)
+placementManager.handle('placement-guest', { type: 'select_trap', trapId: secondOption.id })
+placementState = placementRoomState()
+const secondPending = placementState?.buildState?.pendingPlacements.find((item) => item.playerId === placementGuest.playerId)
+assert.ok(secondPending)
+placementManager.handle('placement-guest', {
+  type: 'place_trap',
+  x: secondPending.x,
+  y: secondPending.y,
+  rotation: secondPending.rotation,
+})
+placementManager.handle('placement-guest', { type: 'confirm_build' })
+placementState = placementRoomState()
+assert.equal(placementState?.status, 'COUNTDOWN')
+
+console.log('all-player placement starts countdown')

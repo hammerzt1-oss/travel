@@ -266,6 +266,7 @@ export type ClientMessage =
   | { type: 'join_room'; roomId: string }
   | { type: 'random_join' }
   | { type: 'reconnect'; roomId: string; token: string }
+  | { type: 'set_name'; name: string }
   | { type: 'ready' }
   | { type: 'select_map'; mapId: string | null }
   | { type: 'start_game' }

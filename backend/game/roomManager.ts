@@ -145,6 +145,8 @@ export class RoomManager {
         return this.randomJoin(socketId)
       case 'reconnect':
         return this.reconnect(socketId, message.roomId, message.token)
+      case 'set_name':
+        return this.setName(socketId, message.name)
       case 'ready':
         return this.setReady(socketId)
       case 'select_map':
@@ -222,12 +224,19 @@ export class RoomManager {
     room.lastEmptyAt = Array.from(room.players.values()).every((item) => !item.connected) ? Date.now() : null
     if (room.hostId === player.id) {
       const nextHost = Array.from(room.players.values()).find((item) => item.connected)
-      if (nextHost) room.hostId = nextHost.id
+      if (nextHost) {
+        room.hostId = nextHost.id
+        nextHost.ready = true
+      }
     }
     if (room.simulation) room.simulation.setConnected(player.id, false)
     if (room.status === 'BUILDING') {
       room.build?.pendingPlacements.delete(player.id)
       this.recomputePendingPlacements(room)
+      if (this.allConnectedPlayersPlaced(room)) {
+        this.finishBuild(room)
+        return
+      }
     }
     this.emit({ type: 'player_left', roomId: room.roomId, playerId: player.id })
     this.broadcastRoom(room)
@@ -252,7 +261,7 @@ export class RoomManager {
     const room: Room = {
       roomId,
       hostId: playerId,
-      status: 'WAITING',
+      status: 'READY',
       round: 1,
       players: new Map([
         [
@@ -260,9 +269,9 @@ export class RoomManager {
           {
             id: playerId,
             slot: 1,
-            label: `Player 1 · ${character.name}`,
+            label: 'Player 1',
             connected: true,
-            ready: false,
+            ready: true,
             score: 0,
             characterId: character.refID,
             characterAsset: character.imageAsset,
@@ -335,7 +344,7 @@ export class RoomManager {
     room.players.set(playerId, {
       id: playerId,
       slot,
-      label: `Player ${slot} · ${character.name}`,
+      label: `Player ${slot}`,
       connected: true,
       ready: false,
       score: 0,
@@ -379,8 +388,34 @@ export class RoomManager {
     if (room.status !== 'WAITING' && room.status !== 'READY') {
       return this.fail(socketId, 'INVALID_PHASE', '当前阶段不能修改准备状态')
     }
+    if (room.hostId === player.id) {
+      // The host is always ready so a one-player league room can start
+      // without an extra preparation click.
+      player.ready = true
+      room.status = Array.from(room.players.values()).every((item) => item.ready && item.connected) ? 'READY' : 'WAITING'
+      this.broadcastRoom(room)
+      return
+    }
     player.ready = !player.ready
     room.status = Array.from(room.players.values()).every((item) => item.ready && item.connected) ? 'READY' : 'WAITING'
+    this.broadcastRoom(room)
+  }
+
+  private setName(socketId: string, rawName: string) {
+    const context = this.context(socketId)
+    if (!context) return
+    const { room, player } = context
+    if (room.status !== 'WAITING' && room.status !== 'READY') {
+      return this.fail(socketId, 'INVALID_PHASE', '游戏开始后不能修改名字')
+    }
+    const name = typeof rawName === 'string'
+      ? rawName.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim()
+      : ''
+    const length = Array.from(name).length
+    if (length < 1 || length > 16) {
+      return this.fail(socketId, 'INVALID_NAME', '名字需要为 1 到 16 个字符')
+    }
+    player.label = name
     this.broadcastRoom(room)
   }
 
@@ -620,7 +655,7 @@ export class RoomManager {
     room.simulation?.setPlacedTraps(room.placedTraps)
     build.pendingPlacements.delete(player.id)
     this.recomputePendingPlacements(room)
-    if (build.options.every((option) => option.claimedBy)) {
+    if (this.allConnectedPlayersPlaced(room)) {
       this.finishBuild(room)
       return
     }
@@ -632,6 +667,11 @@ export class RoomManager {
     if (!context || !context.room.simulation) return
     if (context.room.status !== 'PLAYING') return
     context.room.simulation.setInput(context.player.id, clampInput(input))
+  }
+
+  private allConnectedPlayersPlaced(room: Room) {
+    const connectedPlayers = Array.from(room.players.values()).filter((player) => player.connected)
+    return connectedPlayers.length > 0 && connectedPlayers.every((player) => room.build?.placedPlayerIds.has(player.id))
   }
 
   private autoConnectSwitchable(room: Room, placedTrap: PlacedTrap) {
@@ -660,9 +700,10 @@ export class RoomManager {
     room.status = 'WAITING'
     room.round = 1
     room.players.forEach((player) => {
-      player.ready = false
+      player.ready = player.id === room.hostId
       player.score = 0
     })
+    room.status = Array.from(room.players.values()).every((player) => player.ready && player.connected) ? 'READY' : 'WAITING'
     room.simulation = null
     room.placedTraps = []
     room.build = null
