@@ -60,6 +60,8 @@ type PlayerTrack = {
     velocityY: number
     jumping: boolean
     updatedAt: number
+    correctionX: number
+    correctionY: number
   }
 }
 
@@ -322,7 +324,33 @@ export class LayaCharacterRenderer {
     previous.samples.push(sample)
     if (previous.samples.length > CHARACTER_MAX_HISTORY) previous.samples.shift()
     if (player.id === this.localPlayerId) {
-      previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+      const prediction = previous.localPrediction
+      if (!prediction) {
+        previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+        return
+      }
+      this.advanceLocalPrediction(receivedAt)
+      const errorX = sample.x - prediction.x
+      const errorY = sample.y - prediction.y
+      // Large corrections are respawns, deaths, or a server-side collision
+      // decision. Snap those explicitly; ordinary network drift is eased out
+      // over several render frames so the animal never rubber-bands.
+      if (
+        Math.abs(errorX) > 180 ||
+        Math.abs(errorY) > 180 ||
+        player.animationState === 'death' ||
+        !player.alive ||
+        player.finished
+      ) {
+        previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
+        return
+      }
+      prediction.correctionX = this.clampCorrection(prediction.correctionX + errorX)
+      prediction.correctionY = this.clampCorrection(prediction.correctionY + errorY)
+      prediction.velocityX = prediction.velocityX * 0.65 + sample.velocityX * 0.35
+      prediction.velocityY = prediction.velocityY * 0.65 + sample.velocityY * 0.35
+      prediction.jumping = player.animationState === 'jump' || player.animationState === 'fall'
+      prediction.updatedAt = receivedAt
     }
   }
 
@@ -334,6 +362,8 @@ export class LayaCharacterRenderer {
       velocityY: sample.velocityY,
       jumping: player.animationState === 'jump' || player.animationState === 'fall',
       updatedAt: receivedAt,
+      correctionX: 0,
+      correctionY: 0,
     }
   }
 
@@ -346,6 +376,11 @@ export class LayaCharacterRenderer {
     const elapsedMs = Math.max(0, Math.min(LOCAL_PREDICTION_MAX_DT_MS, now - prediction.updatedAt))
     if (elapsedMs <= 0) return
     const dt = elapsedMs / 1000
+    const correctionBlend = Math.min(1, dt * 12)
+    prediction.x += prediction.correctionX * correctionBlend
+    prediction.y += prediction.correctionY * correctionBlend
+    prediction.correctionX *= 1 - correctionBlend
+    prediction.correctionY *= 1 - correctionBlend
     const horizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
     const targetVelocity = horizontal * PDZZ_PHYSICS.player.normalHorizontalSpeed
     const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
@@ -372,6 +407,10 @@ export class LayaCharacterRenderer {
     if (value < target) return Math.min(value + amount, target)
     if (value > target) return Math.max(value - amount, target)
     return target
+  }
+
+  private clampCorrection(value: number) {
+    return Math.max(-120, Math.min(120, value))
   }
 
   private interpolatedPosition(track: PlayerTrack, now: number) {

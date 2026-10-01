@@ -82,9 +82,11 @@ const COUNTDOWN_DURATION_MS = 3_000
 const TOTAL_ROUNDS = 5
 const DISCONNECT_GRACE_MS = 30_000
 const EMPTY_ROOM_TTL_MS = 5 * 60_000
-// Keep authoritative snapshots at 30Hz so remote movement and input feedback
-// do not appear to advance in 20Hz steps.
-const GAME_STATE_BROADCAST_INTERVAL_MS = 33
+// Some Node runtimes quantize a 17ms timer to roughly 31ms. A 33ms threshold
+// then misses every other timer callback and produces an accidental 16Hz
+// stream. Use a 15ms threshold so the effective stream stays above 30Hz on
+// both coarse desktop timers and normal server timers.
+const GAME_STATE_BROADCAST_INTERVAL_MS = 15
 
 function normalizeRoomId(value: unknown) {
   if (typeof value !== 'string') return ''
