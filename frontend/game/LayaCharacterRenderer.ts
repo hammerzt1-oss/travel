@@ -169,6 +169,7 @@ export class LayaCharacterRenderer {
     canvas.style.pointerEvents = 'none'
     canvas.style.background = 'transparent'
     canvas.style.zIndex = '3'
+    canvas.classList.add('pdzz-laya-character-canvas')
     canvas.draggable = false
     canvas.setAttribute('aria-hidden', 'true')
     canvas.addEventListener('contextmenu', preventCanvasMenu)

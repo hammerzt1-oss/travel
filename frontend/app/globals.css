@@ -693,6 +693,13 @@ input:focus { border-color: var(--coral); }
   user-select: none;
   -webkit-user-drag: none;
 }
+.pdzz-persistent-game-canvas .pdzz-laya-character-canvas {
+  /* Laya applies its own mobile stage transform. The canvas is already
+     fitted by the shared 750x1670 CSS surface, so that transform would scale
+     the character layer a second time and pin it to the top-left corner. */
+  transform: none !important;
+  transform-origin: 0 0 !important;
+}
 .pdzz-persistent-game-canvas img,
 .pdzz-game-screen img,
 .pdzz-build-screen img {
