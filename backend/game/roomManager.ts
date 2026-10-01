@@ -82,7 +82,9 @@ const COUNTDOWN_DURATION_MS = 3_000
 const TOTAL_ROUNDS = 5
 const DISCONNECT_GRACE_MS = 30_000
 const EMPTY_ROOM_TTL_MS = 5 * 60_000
-const GAME_STATE_BROADCAST_INTERVAL_MS = 50
+// Keep authoritative snapshots at 30Hz so remote movement and input feedback
+// do not appear to advance in 20Hz steps.
+const GAME_STATE_BROADCAST_INTERVAL_MS = 33
 
 function normalizeRoomId(value: unknown) {
   if (typeof value !== 'string') return ''

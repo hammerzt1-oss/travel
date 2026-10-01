@@ -29,6 +29,7 @@ const PDZZ_VIEWPORT_WIDTH = 750
 // 1334 here compresses the vertical composition and hides the grass line.
 const PDZZ_VIEWPORT_HEIGHT = 1670
 const ROTATIONS = [0, 90, 180, 270] as const
+const GAME_STATE_RENDER_INTERVAL_MS = 33
 
 function ComponentIcon({
   option,
@@ -192,12 +193,15 @@ function MapWarmupLayer({ state }: { state: GameState | null }) {
 }
 */
 
+type LocalInputListener = (playerId: string | null, input: PlayerInput) => void
+
 function GameCanvas({
   state,
   build,
   countdown,
   localPlayerId,
   localInput,
+  localInputListenerRef,
   onPlace,
 }: {
   state: GameState | null
@@ -205,6 +209,7 @@ function GameCanvas({
   countdown: number | null
   localPlayerId: string | null
   localInput: PlayerInput
+  localInputListenerRef: MutableRefObject<LocalInputListener | null>
   onPlace: (x: number, y: number) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -274,6 +279,10 @@ function GameCanvas({
         return
       }
       characterRendererRef.current = renderer
+      const applyInputImmediately: LocalInputListener = (playerId, input) => {
+        renderer.setLocalInput(playerId, input)
+      }
+      localInputListenerRef.current = applyInputImmediately
       renderer.setLocalInput(localPlayerId, localInput)
       renderer.update(state, sceneRef.current)
     })
@@ -281,6 +290,7 @@ function GameCanvas({
       cancelled = true
       characterRendererRef.current?.destroy()
       characterRendererRef.current = null
+      localInputListenerRef.current = null
       sceneRef.current = null
       game.destroy(true)
     }
@@ -402,6 +412,7 @@ export default function PartyGame() {
   const gameStateFlushTimerRef = useRef<number | null>(null)
   const lastGameStateCommitAt = useRef(0)
   const localInputRef = useRef<PlayerInput>({ left: false, right: false, jump: false })
+  const localInputListenerRef = useRef<LocalInputListener | null>(null)
   const [localInput, setLocalInput] = useState<PlayerInput>({ left: false, right: false, jump: false })
   const [nameDraft, setNameDraft] = useState('')
   const nameDraftPlayerRef = useRef<string | null>(null)
@@ -411,7 +422,7 @@ export default function PartyGame() {
     pendingGameStateRef.current = next
     const currentTime = performance.now()
     const elapsed = currentTime - lastGameStateCommitAt.current
-    if (immediate || elapsed >= 50) {
+    if (immediate || elapsed >= GAME_STATE_RENDER_INTERVAL_MS) {
       if (gameStateFlushTimerRef.current !== null) {
         window.clearTimeout(gameStateFlushTimerRef.current)
         gameStateFlushTimerRef.current = null
@@ -425,7 +436,7 @@ export default function PartyGame() {
         gameStateFlushTimerRef.current = null
         lastGameStateCommitAt.current = performance.now()
         setGameState(pendingGameStateRef.current)
-      }, Math.max(0, 50 - elapsed))
+      }, Math.max(0, GAME_STATE_RENDER_INTERVAL_MS - elapsed))
     }
   }, [])
 
@@ -439,10 +450,14 @@ export default function PartyGame() {
   }, [])
 
   const updateLocalInput = useCallback((input: PlayerInput) => {
-    localInputRef.current = input
-    setLocalInput(input)
-    send({ type: 'input', input })
-  }, [send])
+    const nextInput = { ...input }
+    localInputRef.current = nextInput
+    // Update local prediction and animation in the same pointer/keyboard
+    // event, before React schedules the next render.
+    localInputListenerRef.current?.(localPlayerId, nextInput)
+    setLocalInput(nextInput)
+    send({ type: 'input', input: nextInput })
+  }, [localPlayerId, send])
 
   const connect = useCallback(() => {
     if (socketRef.current) return socketRef.current
@@ -584,7 +599,7 @@ export default function PartyGame() {
     const timer = window.setInterval(() => {
       const socket = socketRef.current
       if (socket?.connected) socket.emit('client_message', { type: 'input', input: localInputRef.current })
-    }, 50)
+    }, GAME_STATE_RENDER_INTERVAL_MS)
     return () => window.clearInterval(timer)
   }, [screen, gameState?.status])
 
@@ -638,8 +653,9 @@ export default function PartyGame() {
   useEffect(() => {
     if (screen === 'game' && gameState?.status === 'PLAYING') return
     localInputRef.current = { left: false, right: false, jump: false }
+    localInputListenerRef.current?.(localPlayerId, localInputRef.current)
     setLocalInput({ left: false, right: false, jump: false })
-  }, [screen, gameState?.status])
+  }, [screen, gameState?.status, localPlayerId])
 
   const resetSocketForNewSession = () => {
     socketRef.current?.disconnect()
@@ -759,6 +775,7 @@ export default function PartyGame() {
             countdown={screen === 'game' ? countdown : null}
             localPlayerId={localPlayerId}
             localInput={localInput}
+            localInputListenerRef={localInputListenerRef}
             onPlace={(x, y) => send({ type: 'place_trap', x, y, rotation: pendingPlacement?.rotation ?? 0 })}
           />
         </div>

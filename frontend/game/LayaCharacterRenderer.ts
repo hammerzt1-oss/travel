@@ -73,10 +73,10 @@ declare global {
 const runtimeUrl = '/game/runtime/laya.vendor.js'
 const PDZZ_VIEWPORT_WIDTH = 750
 const PDZZ_VIEWPORT_HEIGHT = 1670
-// The server broadcasts at 20Hz. Rendering a short history lets the browser
+// The server broadcasts at 30Hz. Rendering a short history lets the browser
 // draw between authoritative samples instead of visibly jumping every packet.
-const CHARACTER_INTERPOLATION_DELAY_MS = 70
-const CHARACTER_MAX_EXTRAPOLATION_MS = 80
+const CHARACTER_INTERPOLATION_DELAY_MS = 50
+const CHARACTER_MAX_EXTRAPOLATION_MS = 66
 const CHARACTER_MAX_HISTORY = 8
 const CHARACTER_ART_HEIGHT = 60
 const CHARACTER_RENDER_INTERVAL_MS = 1000 / 60
