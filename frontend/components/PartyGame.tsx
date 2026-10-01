@@ -305,7 +305,7 @@ function GameCanvas({
       onContextMenu={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
     >
-      {(build || state?.status === 'COUNTDOWN') && (
+      {state?.status === 'COUNTDOWN' && (
         <div className="game-loading" aria-live="polite">
           <span className="game-loading-spinner" aria-hidden="true" />
           <strong>加载中...</strong>
