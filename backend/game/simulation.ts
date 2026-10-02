@@ -568,6 +568,22 @@ function trapCellRects(
   }))
 }
 
+/**
+ * vv does not use one collider per editor cell. Its platform entity is one
+ * rotated 2x1 BoxCollider (100x50 up/down, 50x100 left/right). The editor
+ * footprint is already rotated before it reaches the server, so its world
+ * bounds are the exact collider bounds for the placed component.
+ */
+function springPlatformRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
+  const motion = trapMotion(trap, elapsed)
+  return [{
+    x: trap.x * CELL_SIZE + motion.offsetX,
+    y: trap.y * CELL_SIZE + motion.offsetY,
+    width: trap.width * CELL_SIZE,
+    height: trap.height * CELL_SIZE,
+  }]
+}
+
 function trapOccupiedBounds(trap: PlacedTrap, elapsed: number) {
   const cells = trapCellRects(trap, elapsed)
   if (cells.length === 0) return null
@@ -925,6 +941,8 @@ export class GameSimulation {
   private crumbleStartedAt = new Map<string, number>()
   private finishTriggerOccupants = new Set<string>()
   private trapActivationAt = new Map<string, number>()
+  /** Last collision normal for each player/spring pair, matching vv's enter/stay state. */
+  private springContacts = new Map<string, Rotation>()
   /** Gas keeps an entered player in its inner-state until the outer box exits. */
   private gasOccupants = new Set<string>()
   /** Ice and mud are maintained by trigger enter/exit, like the APK model. */
@@ -1313,7 +1331,10 @@ export class GameSimulation {
       // trigger it, matching the APK's CharacterController contact callback.
       const isSurface = definition.collisionMode === 'solid' || definition.collisionMode === 'hybrid'
       if (!isSurface) return []
-      return trapCellRects(trap, this.elapsed).map((rect, index) => ({
+      const rects = trap.trapId === 'spring'
+        ? springPlatformRects(trap, this.elapsed)
+        : trapCellRects(trap, this.elapsed)
+      return rects.map((rect, index) => ({
         id: `trap-surface-${trap.instanceId}-${index}`,
         x: rect.x,
         y: rect.y,
@@ -1373,10 +1394,16 @@ export class GameSimulation {
         if (landingPlatform.definition.collisionMode !== 'hybrid') {
           // vv only reacts to a collision normal matching its face. A top
           // landing is therefore a spring hit only for the upward rotation.
-          if (landingPlatform.trap.trapId === 'spring' && landingPlatform.trap.rotation === 0) {
-            this.applySpringEffect(player, landingPlatform.trap)
+          if (landingPlatform.trap.trapId === 'spring') {
+            // Spring effects are driven by the collision normal below. A
+            // downward-facing spring is still solid, but a top landing is
+            // not its matching face and must not bounce.
+            if (landingPlatform.trap.rotation !== 0) {
+              player.springJump = false
+            }
+          } else {
+            this.applyTrapEffect(player, landingPlatform.trap, landingPlatform.definition.effect)
           }
-          else this.applyTrapEffect(player, landingPlatform.trap, landingPlatform.definition.effect)
         }
         if (!player.alive || player.finished) return
       }
@@ -1390,8 +1417,8 @@ export class GameSimulation {
     // Resolve contacts when a frame starts inside a collider or crosses a
     // thin collider at high speed, matching the source penetration pass.
     this.resolvePlatformWalls(player, previousX, previousY)
-    this.resolveTrapWalls(player, previousX)
     this.applySpringFromMovement(player, movement)
+    this.resolveTrapWalls(player, previousX)
     player.velocityX = inputVelocityX + player.extraHorizontalAirSpeed
 
     for (const hazard of this.level.hazards) {
@@ -1626,7 +1653,10 @@ export class GameSimulation {
       // The APK linearsaw base is a platform collider. The character
       // controller already resolves its top face; a penetration correction
       // here must not turn a top landing into a horizontal wall hit.
-      if (trap.trapId === 'linearsaw') continue
+      // Springs are handled by the same ray result as map platforms. Running
+      // a second cell-sized wall pass after the spring impulse would erase
+      // the side-launch position and velocity.
+      if (trap.trapId === 'linearsaw' || trap.trapId === 'spring') continue
       for (const rect of trapCellRects(trap, this.elapsed)) {
         const trapX = rect.x
         const trapWidth = rect.width
@@ -1647,31 +1677,54 @@ export class GameSimulation {
     player: SimPlayer,
     movement: ReturnType<typeof moveCharacter>,
   ) {
-    if (!movement.hitLeft && !movement.hitRight && !movement.hitCeiling) return
+    const activeContacts = new Set<string>()
     for (const trap of this.placedTraps) {
       if (trap.trapId !== 'spring') continue
-      for (const rect of trapCellRects(trap, this.elapsed)) {
+      const rects = springPlatformRects(trap, this.elapsed)
+      for (const rect of rects) {
         const verticalOverlap = player.y + PLAYER_HEIGHT > rect.y && player.y < rect.y + rect.height
         const horizontalOverlap = player.x + PLAYER_WIDTH > rect.x && player.x < rect.x + rect.width
-        const touchedRightFace = movement.hitLeft && trap.rotation === 90 &&
-          Math.abs(player.x - (rect.x + rect.width)) <= 1
-        const touchedLeftFace = movement.hitRight && trap.rotation === 270 &&
-          Math.abs(player.x + PLAYER_WIDTH - rect.x) <= 1
-        const touchedBottomFace = movement.hitCeiling && trap.rotation === 180 &&
-          Math.abs(player.y - (rect.y + rect.height)) <= 1
-        if (
-          (touchedRightFace && verticalOverlap) ||
-          (touchedLeftFace && verticalOverlap) ||
-          (touchedBottomFace && horizontalOverlap)
-        ) {
-          this.applySpringEffect(player, trap)
-          return
+        const faceTolerance = 3
+        let contact: Rotation | null = null
+        if (movement.grounded && movement.surface &&
+          (movement.surface as Surface).trap?.instanceId === trap.instanceId &&
+          horizontalOverlap) {
+          contact = 0
+        } else if (movement.hitRight && trap.rotation === 90 && verticalOverlap &&
+          Math.abs(player.x + PLAYER_WIDTH - rect.x) <= faceTolerance) {
+          contact = 90
+        } else if (movement.hitLeft && trap.rotation === 270 && verticalOverlap &&
+          Math.abs(player.x - (rect.x + rect.width)) <= faceTolerance) {
+          contact = 270
+        } else if (movement.hitCeiling && trap.rotation === 180 && horizontalOverlap &&
+          Math.abs(player.y - (rect.y + rect.height)) <= faceTolerance) {
+          contact = 180
         }
+
+        const key = `${trap.instanceId}:${player.id}`
+        if (contact === null) {
+          this.springContacts.delete(key)
+          continue
+        }
+        activeContacts.add(key)
+        const previousContact = this.springContacts.get(key)
+        this.springContacts.set(key, contact)
+        // vv fires on enter when the normal already matches, and on stay only
+        // after the normal changes to the matching face. It does not bounce a
+        // player again every fixed tick while the body remains touching.
+        if (contact === trap.rotation && previousContact !== contact) {
+          this.applySpringEffect(player, trap, rect)
+        }
+        break
       }
+    }
+    for (const key of this.springContacts.keys()) {
+      if (!key.endsWith(`:${player.id}`) || activeContacts.has(key)) continue
+      this.springContacts.delete(key)
     }
   }
 
-  private applySpringEffect(player: SimPlayer, trap: PlacedTrap) {
+  private applySpringEffect(player: SimPlayer, trap: PlacedTrap, contactedRect?: TrapRect) {
     const cooldownUntil = player.trapCooldowns.get(trap.instanceId) ?? 0
     if (cooldownUntil > this.elapsed) return
 
@@ -1694,7 +1747,10 @@ export class GameSimulation {
         player.onGround = false
         break
       default:
-        player.y = Math.min(player.y, trapWorldRect(trap, this.elapsed).y - PLAYER_HEIGHT)
+        player.y = Math.min(
+          player.y,
+          (contactedRect?.y ?? springPlatformRects(trap, this.elapsed)[0]?.y ?? trapWorldRect(trap, this.elapsed).y) - PLAYER_HEIGHT,
+        )
         player.velocityY = springVelocity
         player.springJump = true
         player.onGround = false

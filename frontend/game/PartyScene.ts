@@ -699,6 +699,35 @@ export class PartyScene extends Phaser.Scene {
     cell: number,
     rotation: Rotation,
   ) {
+    if (trapId === 'spring') {
+      // vv's entity origin is the bottom centre of the unrotated 2x1
+      // armature. Rotating that entity moves the origin to the corresponding
+      // edge of the rotated footprint; centering it vertically lifts the
+      // spring one full editor cell above the platform.
+      switch (rotation) {
+        case 90:
+          return { x: x * cell, y: (y + height / 2) * cell, angle: rotation }
+        case 180:
+          return { x: (x + width / 2) * cell, y: y * cell, angle: rotation }
+        case 270:
+          return { x: (x + width) * cell, y: (y + height / 2) * cell, angle: rotation }
+        default:
+          return { x: (x + width / 2) * cell, y: (y + height) * cell, angle: rotation }
+      }
+    }
+
+    if (trapId === 'spike' || trapId === 'spike3x1' || trapId === 'ice' || trapId === 'mud') {
+      // These APK sprites are authored around the centre of their occupied
+      // cell(s). The gameplay trigger is a smaller strip inside that cell;
+      // it must not be used as the sprite anchor or the art floats away from
+      // the platform after a rotation.
+      return {
+        x: (x + width / 2) * cell,
+        y: (y + height / 2) * cell,
+        angle: rotation,
+      }
+    }
+
     if (trapId !== 'triggerspikes') {
       return {
         x: (x + width / 2) * cell,
@@ -1037,7 +1066,7 @@ export class PartyScene extends Phaser.Scene {
       state.level.cellSize,
       rotation,
     )
-    if (trapId === 'linearsaw' || trapId === 'triggerspikes') {
+    if (trapId === 'linearsaw' || trapId === 'triggerspikes' || trapId === 'spring') {
       this.previewSprite?.destroy()
       this.previewSprite = undefined
       if (!this.previewTrapContainer) {

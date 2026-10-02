@@ -64,7 +64,11 @@ assert.deepEqual(
   ],
 )
 assert.equal(isLegalTrapPlacement('spike', 2, 25, 0, [], haystack), true)
+assert.equal(isLegalTrapPlacement('ice', 2, 25, 0, [], haystack), true)
+assert.equal(isLegalTrapPlacement('mud', 2, 25, 0, [], haystack), true)
 assert.equal(isLegalTrapPlacement('spike', 2, 24, 0, [], haystack), false)
+assert.equal(isLegalTrapPlacement('ice', 2, 24, 0, [], haystack), false)
+assert.equal(isLegalTrapPlacement('mud', 2, 24, 0, [], haystack), false)
 assert.equal(isLegalTrapPlacement('spike', 0, 25, 0, [], haystack), false)
 assert.equal(isLegalTrapPlacement('spike', 2, 28, 0, [], haystack), false)
 assert.equal(isLegalTrapPlacement('spike3x1', 2, 25, 0, [], haystack), true)
@@ -550,8 +554,10 @@ assert.equal(springPlayer.onGround, false)
 assert.ok(springPlayer.velocityY < -1000)
 
 // vv maps 90 degrees to the right-facing spring and 270 degrees to the
-// left-facing spring. Only the matching side contact may create the impulse,
-// and the impulse must survive the wall penetration pass on the same tick.
+// left-facing spring. A right-facing spring is entered from its left face;
+// a left-facing spring is entered from its right face. Only the matching
+// side contact may create the impulse, and the impulse must survive the wall
+// penetration pass on the same tick.
 const rightSpring: PlacedTrap = {
   instanceId: 'spring-right-1',
   trapId: 'spring',
@@ -570,11 +576,11 @@ const rightSpringSimulation = new GameSimulation(
 )
 const rightSpringPlayer = rightSpringSimulation.players.get('spring-right-player')
 assert.ok(rightSpringPlayer)
-rightSpringPlayer.x = 155
+rightSpringPlayer.x = 70
 rightSpringPlayer.y = 500
 rightSpringPlayer.onGround = false
-rightSpringPlayer.velocityX = -300
-rightSpringSimulation.setInput('spring-right-player', { left: true, right: false, jump: false })
+rightSpringPlayer.velocityX = 300
+rightSpringSimulation.setInput('spring-right-player', { left: false, right: true, jump: false })
 rightSpringSimulation.tick(1 / 60)
 assert.ok(rightSpringPlayer.velocityX > 800)
 
@@ -596,11 +602,11 @@ const leftSpringSimulation = new GameSimulation(
 )
 const leftSpringPlayer = leftSpringSimulation.players.get('spring-left-player')
 assert.ok(leftSpringPlayer)
-leftSpringPlayer.x = 70
+leftSpringPlayer.x = 150
 leftSpringPlayer.y = 500
 leftSpringPlayer.onGround = false
-leftSpringPlayer.velocityX = 100
-leftSpringSimulation.setInput('spring-left-player', { left: false, right: true, jump: false })
+leftSpringPlayer.velocityX = -300
+leftSpringSimulation.setInput('spring-left-player', { left: true, right: false, jump: false })
 leftSpringSimulation.tick(1 / 60)
 assert.ok(leftSpringPlayer.velocityX < -800)
 
@@ -628,6 +634,39 @@ downSpringPlayer.onGround = false
 downSpringPlayer.velocityY = -300
 downSpringSimulation.tick(1 / 60)
 assert.ok(downSpringPlayer.velocityY > 400)
+
+// A down-facing spring is still a solid platform, but its upward collision
+// normal is not the spring face. Landing on it must not bounce.
+const downSpringTopSimulation = new GameSimulation(
+  1,
+  [{ id: 'spring-down-top-player', slot: 1, label: 'Player 1', score: 0 }],
+  [downSpring],
+)
+const downSpringTopPlayer = downSpringTopSimulation.players.get('spring-down-top-player')
+assert.ok(downSpringTopPlayer)
+downSpringTopPlayer.x = 110
+downSpringTopPlayer.y = 140
+downSpringTopPlayer.onGround = false
+downSpringTopPlayer.velocityY = 300
+downSpringTopSimulation.tick(1 / 60)
+assert.equal(downSpringTopPlayer.onGround, true)
+assert.equal(downSpringTopPlayer.velocityY, 0)
+
+// The up-facing spring must not trigger when the player hits its underside.
+const upSpringBottomSimulation = new GameSimulation(
+  1,
+  [{ id: 'spring-up-bottom-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{ ...spring, instanceId: 'spring-up-bottom', y: 8 }],
+)
+const upSpringBottomPlayer = upSpringBottomSimulation.players.get('spring-up-bottom-player')
+assert.ok(upSpringBottomPlayer)
+upSpringBottomPlayer.x = 110
+upSpringBottomPlayer.y = 450
+upSpringBottomPlayer.onGround = false
+upSpringBottomPlayer.velocityY = -300
+upSpringBottomSimulation.tick(1 / 60)
+assert.equal(upSpringBottomPlayer.onGround, false)
+assert.ok(upSpringBottomPlayer.velocityY > -400)
 
 const cactus: PlacedTrap = {
   instanceId: 'cactus-1',
