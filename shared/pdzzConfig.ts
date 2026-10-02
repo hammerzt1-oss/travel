@@ -89,14 +89,15 @@ export const PDZZ_PHYSICS = {
     },
     "spring": {
       "jumpHeightMultiplier": 1.5,
-      "triggerSpringVelocityMultiplier": 1.1,
+      "triggerSpringVelocityMultiplier": 1.2,
       "triggersSpringUsesPlayerJumpVelocity": true
     },
     "linearSaw": {
-      "defaultSpeed": 300,
-      "intervalSeconds": 3,
-      "pingPongSpeed": 0.2,
-      "maxRotationDegrees": 60
+      "speed": 100,
+      "travelPixels": 200,
+      "easing": "sineInOut",
+      "spinDegreesPerSecond": 500,
+      "bladeRadius": 20
     }
   }
 } as const
@@ -29166,3 +29167,90 @@ export const PDZZ_LEAGUE_MAP_IDS = PDZZ_LEAGUE_MAP_CATALOG.map((map) => map.id)
 export const PDZZ_PLAYABLE_MAP_IDS = PDZZ_LEAGUE_MAP_IDS
 export function getPdzzMap(mapId: string | null | undefined) { return PDZZ_MAPS.find((map) => map.id === mapId) ?? PDZZ_MAPS.find((map) => map.id === 'levelfarm') ?? PDZZ_MAPS[0] }
 export function getPdzzCharacterForSlot(slot: number) { return PDZZ_CHARACTERS[(Math.max(1, slot) - 1) % PDZZ_CHARACTERS.length] ?? PDZZ_CHARACTERS[0] }
+
+/**
+ * The eleven components used by the league build phase. The mechanics and
+ * wording below are taken from the extracted APK creators, rather than from
+ * the generic editor catalog descriptions.
+ */
+export const PDZZ_LEAGUE_COMPONENT_IDS = [
+  'fortunecat',
+  'gas',
+  'triggerhazard',
+  'spike3x1',
+  'mud',
+  'triggerspikes',
+  'spike',
+  'spring',
+  'ice',
+  'spikeball',
+  'linearsaw',
+] as const
+
+export type PdzzLeagueComponentGuide = {
+  id: (typeof PDZZ_LEAGUE_COMPONENT_IDS)[number]
+  functionText: string
+  configuration: string
+}
+
+export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
+  {
+    id: 'fortunecat',
+    functionText: '进入触发区后招财猫挥爪，爪子碰到动物立即淘汰。',
+    configuration: '1×2 格；触发盒 2.6×0.8 格；触发后 0.8 秒挥爪，伤害盒 2.6×0.5 格，沿朝向偏移 0.2×组件高度（0.4 格）；伤害保持 1 秒。',
+  },
+  {
+    id: 'gas',
+    functionText: '进入内圈后反转左右操作；离开整片毒气后进入倒计时。',
+    configuration: '1×1 格；内圈 1.5×1.5 格，外圈 2×2 格；内圈进入事件只触发一次，离开外圈后反向状态再保持 2 秒，期间不会每帧重新眩晕。',
+  },
+  {
+    id: 'triggerhazard',
+    functionText: '动物踩中仙人掌后伸出，刺到动物立即淘汰。',
+    configuration: '1×1 格；半径 0.5 格圆形触发器；0.3 秒预备、0.5 秒伸出、0.8 秒保持、0.5 秒收回；刺伸出超过 50% 才有伤害。',
+  },
+  {
+    id: 'spike3x1',
+    functionText: '三根独立地刺组成一组，任意一根接触都会淘汰动物。',
+    configuration: '3×1 格；APK Jf 创建 3 个独立地刺子组件；默认贴平台，朝向旋转后每根碰撞条仍随方向旋转。',
+  },
+  {
+    id: 'mud',
+    functionText: '踩在泥巴上会减速，并使用泥地跳跃和贴墙下滑参数。',
+    configuration: '1×1 格；朝上时触发条为 40×15 px；水平速度 100，泥地跳跃高度 60，泥墙下滑重力倍率 2；离开触发条立即恢复。',
+  },
+  {
+    id: 'triggerspikes',
+    functionText: '从对应碰撞面触发弹簧刺，伸出期间接触即淘汰。',
+    configuration: '4×1 格；只能从组件朝向的面触发；预警 0.55 秒，刺保持约 3 秒，0.05 秒收回；触发盒随朝向偏移到伸出侧。',
+  },
+  {
+    id: 'spike',
+    functionText: '动物接触地刺的尖刺区域立即淘汰。',
+    configuration: '1×1 格；默认贴平台；朝上碰撞条 40×15 px，旋转后为 15×40 px 或反向底边条。',
+  },
+  {
+    id: 'spring',
+    functionText: '从弹簧朝向的碰撞面触发弹起或横向弹射。',
+    configuration: '2×1 格；平台碰撞体按朝向为 100×50 或 50×100 px；上弹高度 1.5×普通跳跃，向右为 1.2×上弹速度，向左为 1×上弹速度，向下为 0.5×下落速度；动画压缩到 0.3 后回弹；仅匹配碰撞面触发。',
+  },
+  {
+    id: 'ice',
+    functionText: '踩到冰面后获得冰面惯性，水平速度提高并减小摩擦。',
+    configuration: '1×1 格；朝上触发条 50×15 px，旋转后为 15×50 px；冰面速度 350，释放方向键时使用 0.2 倍水平加速度减速。',
+  },
+  {
+    id: 'spikeball',
+    functionText: '碰到刺球圆形伤害区立即淘汰。',
+    configuration: '1×1 格；自由朝向；圆形伤害碰撞半径为 17.5 px（50×0.5×0.7）。',
+  },
+  {
+    id: 'linearsaw',
+    functionText: '站在锯台上会被往返移动的锯片切中，锯片接触动物立即淘汰。',
+    configuration: '5×1 格平台；显示区域 5×2 格；底座为平台碰撞体，锯片为半径 20 px 的独立圆形伤害体；锯片沿 200 px 路径以 100 px/s 使用 sineInOut 往返，并以 500°/s 自转；旋转方向时平台与锯片按原作四向局部坐标重置。',
+  },
+]
+
+export const PDZZ_LEAGUE_COMPONENT_GUIDE_BY_ID = Object.fromEntries(
+  PDZZ_LEAGUE_COMPONENT_GUIDE.map((guide) => [guide.id, guide]),
+) as Record<(typeof PDZZ_LEAGUE_COMPONENT_IDS)[number], PdzzLeagueComponentGuide>

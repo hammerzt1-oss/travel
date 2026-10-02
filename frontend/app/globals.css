@@ -389,6 +389,38 @@ input:focus { border-color: var(--coral); }
   white-space: nowrap;
 }
 .random-map-choice { background: rgba(157, 215, 209, 0.32); }
+.room-settings {
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 249, 233, 0.62);
+}
+.room-setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 30px;
+  cursor: pointer;
+}
+.room-setting-toggle input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin: 0;
+  accent-color: var(--coral);
+}
+.room-setting-toggle input:disabled { cursor: not-allowed; }
+.room-setting-copy { display: grid; gap: 3px; min-width: 0; }
+.room-setting-copy strong { font-size: 14px; }
+.room-setting-copy small { color: rgba(24, 52, 58, 0.62); font-size: 11px; }
+.room-setting-owner {
+  margin-left: auto;
+  color: rgba(24, 52, 58, 0.55);
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
 .player-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .player-board {
   display: flex;
@@ -965,6 +997,72 @@ input:focus { border-color: var(--coral); }
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
+.pdzz-component-guide {
+  display: grid;
+  gap: 5px;
+  margin-top: 7px;
+  min-width: 0;
+}
+.pdzz-component-guide-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(255, 255, 255, .92);
+  font-size: 11px;
+}
+.pdzz-component-guide-heading span {
+  color: rgba(255, 255, 255, .58);
+  font-size: 9px;
+}
+.pdzz-component-guide-list {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+.pdzz-component-guide-card {
+  display: grid;
+  flex: 0 0 min(210px, 68vw);
+  grid-template-columns: 34px 1fr;
+  column-gap: 6px;
+  align-content: start;
+  min-height: 70px;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(0, 0, 0, .22);
+  color: rgba(255, 255, 255, .86);
+}
+.pdzz-component-guide-card .component-icon-frame,
+.pdzz-component-guide-card .component-icon-fallback {
+  grid-row: 1 / span 3;
+  width: 34px;
+  height: 30px;
+}
+.pdzz-component-guide-card .component-icon-image { max-width: 34px; max-height: 30px; }
+.pdzz-component-guide-card > strong { align-self: center; font-size: 10px; }
+.pdzz-component-guide-card p,
+.pdzz-component-guide-card small {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 2px 0 0;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+}
+.pdzz-component-guide-card p {
+  color: rgba(255, 255, 255, .78);
+  font-size: 9px;
+  -webkit-line-clamp: 2;
+}
+.pdzz-component-guide-card small {
+  color: rgba(255, 255, 255, .58);
+  font-size: 8px;
+  -webkit-line-clamp: 3;
+}
+.pdzz-build-screen .trap-drawer.placing .pdzz-component-guide { display: none; }
 .pdzz-build-screen .trap-option {
   min-height: 74px;
   padding: 4px;

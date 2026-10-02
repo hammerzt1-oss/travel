@@ -100,6 +100,10 @@ export type PlacedTrap = {
   offsetX?: number
   offsetY?: number
   visualRotation?: number
+  /** Runtime transform of a moving sub-entity (the APK horizontal saw blade). */
+  movingOffsetX?: number
+  movingOffsetY?: number
+  movingRotation?: number
   /** Runtime state exposed for component-specific visual states. */
   active?: boolean
   phase?: 'idle' | 'warning' | 'active' | 'reverting'
@@ -231,6 +235,8 @@ export type RoomPlayer = {
 export type RoomState = {
   roomId: string
   hostId: string
+  /** Whether living players block each other during the race. Off by default. */
+  playerCollisionEnabled: boolean
   status: RoomStatus
   round: number
   players: RoomPlayer[]
@@ -271,6 +277,7 @@ export type ClientMessage =
   | { type: 'set_name'; name: string }
   | { type: 'ready' }
   | { type: 'select_map'; mapId: string | null }
+  | { type: 'set_player_collision'; enabled: boolean }
   | { type: 'start_game' }
   | { type: 'select_trap'; trapId: string }
   | { type: 'place_trap'; x: number; y: number; rotation: Rotation }

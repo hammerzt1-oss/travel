@@ -734,13 +734,35 @@ export class PartyScene extends Phaser.Scene {
       trap.trapId,
       phase,
       trap.rotation,
-      trap.visualRotation ?? trap.rotation,
+      trap.trapId === 'linearsaw' ? trap.rotation : (trap.visualRotation ?? trap.rotation),
       trap.offsetX ?? 0,
       trap.offsetY ?? 0,
       animationStep,
       cactusAnimationStep,
       gasFrame,
     ].join('|')
+  }
+
+  private linearSawLocalPosition(trap: GameState['level']['traps'][number]) {
+    return {
+      x: trap.movingOffsetX ?? (trap.rotation === 90 ? 45 : trap.rotation === 180 ? 100 : trap.rotation === 270 ? -45 : -100),
+      y: trap.movingOffsetY ?? (trap.rotation === 90 ? -100 : trap.rotation === 180 ? 45 : trap.rotation === 270 ? 100 : -45),
+      rotation: trap.movingRotation ?? trap.rotation,
+    }
+  }
+
+  private updateLinearSawVisual(
+    container: Phaser.GameObjects.Container,
+    trap: GameState['level']['traps'][number],
+  ) {
+    if (container.list.length < 3) return
+    const stand = container.list[1] as Phaser.GameObjects.Image
+    const saw = container.list[2] as Phaser.GameObjects.Image
+    const position = this.linearSawLocalPosition(trap)
+    stand.setPosition(position.x, position.y)
+    stand.setAngle(trap.rotation)
+    saw.setPosition(position.x, position.y)
+    saw.setAngle(position.rotation)
   }
 
   private rebuildTrapVisual(
@@ -754,6 +776,19 @@ export class PartyScene extends Phaser.Scene {
     const startedAt = this.trapPhaseStartedAt.get(trap.instanceId) ?? this.time.now
     const age = Math.max(0, (this.time.now - startedAt) / 1000)
     container.removeAll(true)
+
+    if (trap.trapId === 'linearsaw') {
+      const baseOffsets = {
+        x: trap.rotation === 90 ? -7 : trap.rotation === 270 ? 7 : 0,
+        y: trap.rotation === 0 ? 7 : trap.rotation === 180 ? -7 : 0,
+      }
+      const base = this.addGameImage(container, 'linearsawbase.png', baseOffsets.x, baseOffsets.y)
+      base?.setAngle(trap.rotation)
+      const position = this.linearSawLocalPosition(trap)
+      this.addGameImage(container, 'linearsawstand.png', position.x, position.y, 1, 0.5, 0.1)?.setAngle(trap.rotation)
+      this.addGameImage(container, 'saw.png', position.x, position.y)?.setAngle(position.rotation)
+      return
+    }
 
     if (trap.trapId === 'triggerspikes') {
       // This is the APK Iv component hierarchy. Its entity origin is the
@@ -799,6 +834,31 @@ export class PartyScene extends Phaser.Scene {
       for (let index = 0; index < 3; index += 1) {
         this.addGameImage(container, 'spike.png', (index - 1) * cell, 0)
       }
+      return
+    }
+
+    if (trap.trapId === 'spike') {
+      this.addGameImage(container, 'spike.png', 0, 0)
+      return
+    }
+
+    if (trap.trapId === 'spring') {
+      // vv is a two-cell component. Use the APK's separate top/bottom strips
+      // and one spring per cell instead of stretching the editor thumbnail.
+      this.addGameImage(container, 'springbottom.png', 0, 0, 1, 0.5, 1)
+      this.addGameImage(container, 'springtop.png', 0, -cell, 1, 0.5, 0)
+      this.addGameImage(container, 'spring.png', -cell / 2, -cell / 2 + 20, 1.2, 0.5, 1)
+      this.addGameImage(container, 'spring.png', cell / 2, -cell / 2 + 20, 1.2, 0.5, 1)
+      return
+    }
+
+    if (trap.trapId === 'ice') {
+      this.addGameImage(container, 'ice.png', 0, 0)
+      return
+    }
+
+    if (trap.trapId === 'spikeball') {
+      this.addGameImage(container, 'spikeball.png', 0, 0)
       return
     }
 
@@ -876,6 +936,7 @@ export class PartyScene extends Phaser.Scene {
         this.rebuildTrapVisual(sprite, state, trap, component)
         this.trapRenderSignatures.set(trap.instanceId, signature)
       }
+      if (trap.trapId === 'linearsaw') this.updateLinearSawVisual(sprite, trap)
       const visualAnchor = this.trapVisualAnchor(
         trap.trapId,
         trap.x,
@@ -887,9 +948,11 @@ export class PartyScene extends Phaser.Scene {
       )
       sprite
         .setPosition(visualAnchor.x + offsetX, visualAnchor.y + offsetY)
-        .setAngle(trap.trapId === 'triggerspikes'
-          ? visualAnchor.angle
-          : (trap.visualRotation ?? trap.rotation))
+        .setAngle(trap.trapId === 'linearsaw'
+          ? 0
+          : trap.trapId === 'triggerspikes'
+            ? visualAnchor.angle
+            : (trap.visualRotation ?? trap.rotation))
     }
   }
 
@@ -974,13 +1037,13 @@ export class PartyScene extends Phaser.Scene {
       state.level.cellSize,
       rotation,
     )
-    if (trapId === 'triggerspikes') {
+    if (trapId === 'linearsaw' || trapId === 'triggerspikes') {
       this.previewSprite?.destroy()
       this.previewSprite = undefined
       if (!this.previewTrapContainer) {
         this.previewTrapContainer = this.add.container(0, 0).setDepth(8)
       }
-      const signature = `${trapId}|${rotation}`
+      const signature = `${trapId}|${rotation}|${width}|${height}`
       if (this.previewTrapSignature !== signature) {
         this.rebuildTrapVisual(
           this.previewTrapContainer,
@@ -1003,7 +1066,7 @@ export class PartyScene extends Phaser.Scene {
       }
       this.previewTrapContainer
         .setPosition(visualAnchor.x, visualAnchor.y)
-        .setAngle(visualAnchor.angle)
+        .setAngle(trapId === 'linearsaw' ? 0 : visualAnchor.angle)
         .setAlpha(0.68)
     } else {
       this.previewTrapContainer?.destroy()

@@ -12,7 +12,12 @@ import type {
   RoundResult,
   ServerMessage,
 } from '../../shared/gameProtocol'
-import { PDZZ_LEAGUE_MAP_CATALOG, PDZZ_MAP_CATALOG } from '../../shared/pdzzConfig'
+import {
+  PDZZ_COMPONENTS,
+  PDZZ_LEAGUE_COMPONENT_GUIDE,
+  PDZZ_LEAGUE_MAP_CATALOG,
+  PDZZ_MAP_CATALOG,
+} from '../../shared/pdzzConfig'
 import { PartyScene } from '../game/PartyScene'
 import { LayaCharacterRenderer } from '../game/LayaCharacterRenderer'
 
@@ -465,10 +470,10 @@ export default function PartyGame() {
     if (socketRef.current) return socketRef.current
     setConnectionState('connecting')
     const socket = io(SERVER_URL, {
-      // WebSocket removes the extra request/response turn that polling adds
-      // to every input. Socket.IO still falls back to polling on restrictive
-      // mobile networks.
-      transports: ['websocket', 'polling'],
+      // Start with polling so a browser that blocks the initial WebSocket
+      // handshake can still connect immediately; Socket.IO upgrades the
+      // established session to WebSocket when the network permits it.
+      transports: ['polling', 'websocket'],
       upgrade: true,
       tryAllTransports: true,
       forceNew: true,
@@ -913,6 +918,21 @@ export default function PartyGame() {
               ))}
             </div>
           </div>
+          <div className="room-settings">
+            <label className="room-setting-toggle">
+              <input
+                type="checkbox"
+                checked={room.playerCollisionEnabled}
+                disabled={!isHost || (room.status !== 'WAITING' && room.status !== 'READY')}
+                onChange={(event) => send({ type: 'set_player_collision', enabled: event.target.checked })}
+              />
+              <span className="room-setting-copy">
+                <strong>玩家间碰撞</strong>
+                <small>{room.playerCollisionEnabled ? '开启：动物之间会互相阻挡' : '关闭：动物可以相互穿过'}</small>
+              </span>
+              {!isHost && <span className="room-setting-owner">房主设置</span>}
+            </label>
+          </div>
           <div className="player-grid">
             {[1, 2, 3, 4].map((slot) => {
               const player = room.players.find((item) => item.slot === slot)
@@ -1012,6 +1032,28 @@ export default function PartyGame() {
                   )
                 })}
               </div>
+              <section className="pdzz-component-guide" aria-label="原作机关说明">
+                <div className="pdzz-component-guide-heading">
+                  <strong>原作机关配置</strong>
+                  <span>滑动查看全部 11 个</span>
+                </div>
+                <div className="pdzz-component-guide-list">
+                  {PDZZ_LEAGUE_COMPONENT_GUIDE.map((guide) => {
+                    // The drawer contains six random options; the reference
+                    // strip must still describe all eleven league components.
+                    const option = build?.options.find((item) => item.id === guide.id)
+                      ?? PDZZ_COMPONENTS.find((item) => item.id === guide.id)
+                    return (
+                      <article className="pdzz-component-guide-card" key={guide.id}>
+                        {option && <ComponentIcon option={option} />}
+                        <strong>{option?.name ?? guide.id}</strong>
+                        <p>{guide.functionText}</p>
+                        <small>{guide.configuration}</small>
+                      </article>
+                    )
+                  })}
+                </div>
+              </section>
             <div className="build-note">
               <strong>格子规则</strong>
                 <span>绿色格都是当前机关的合法位置；所有机关必须整格对齐，不能和地面或已有机关重叠。只有标注“必须贴平台”的机关需要支撑。</span>
