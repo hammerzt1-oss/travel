@@ -71,7 +71,7 @@ function TouchControls({
   inputRef,
   disabled = false,
 }: {
-  onInput: (input: PlayerInput) => void
+  onInput: (input: PlayerInput, jumpPressed?: boolean) => void
   inputRef: MutableRefObject<PlayerInput>
   disabled?: boolean
 }) {
@@ -92,10 +92,10 @@ function TouchControls({
     setPressed({ left: false, right: false, jump: false })
   }, [disabled, inputRef])
 
-  const update = (key: keyof PlayerInput, value: boolean) => {
+  const update = (key: keyof PlayerInput, value: boolean, jumpPressed = false) => {
     inputRef.current = { ...inputRef.current, [key]: value }
     setPressed((current) => ({ ...current, [key]: value }))
-    onInput(inputRef.current)
+    onInput(inputRef.current, jumpPressed)
   }
 
   useEffect(() => {
@@ -117,7 +117,7 @@ function TouchControls({
       if (disabled) return
       event.preventDefault()
       event.currentTarget.setPointerCapture(event.pointerId)
-      update(key, true)
+      update(key, true, key === 'jump')
     },
     onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => {
       event.preventDefault()
@@ -193,7 +193,7 @@ function MapWarmupLayer({ state }: { state: GameState | null }) {
 }
 */
 
-type LocalInputListener = (playerId: string | null, input: PlayerInput, sequence?: number) => void
+type LocalInputListener = (playerId: string | null, input: PlayerInput, sequence?: number, jumpPressed?: boolean) => void
 
 function GameCanvas({
   state,
@@ -279,8 +279,8 @@ function GameCanvas({
         return
       }
       characterRendererRef.current = renderer
-      const applyInputImmediately: LocalInputListener = (playerId, input) => {
-        renderer.setLocalInput(playerId, input)
+      const applyInputImmediately: LocalInputListener = (playerId, input, sequence, jumpPressed) => {
+        renderer.setLocalInput(playerId, input, sequence, jumpPressed)
       }
       localInputListenerRef.current = applyInputImmediately
       renderer.setLocalInput(localPlayerId, localInput)
@@ -449,16 +449,16 @@ export default function PartyGame() {
     socket.emit('client_message', message)
   }, [])
 
-  const updateLocalInput = useCallback((input: PlayerInput) => {
+  const updateLocalInput = useCallback((input: PlayerInput, jumpPressed = false) => {
     const nextInput = { ...input }
     const sequence = inputSequenceRef.current + 1
     inputSequenceRef.current = sequence
     localInputRef.current = nextInput
     // Update local prediction and animation in the same pointer/keyboard
     // event, before React schedules the next render.
-    localInputListenerRef.current?.(localPlayerId, nextInput, sequence)
+    localInputListenerRef.current?.(localPlayerId, nextInput, sequence, jumpPressed)
     setLocalInput(nextInput)
-    send({ type: 'input', input: nextInput, sequence })
+    send({ type: 'input', input: nextInput, sequence, jumpPressed })
   }, [localPlayerId, send])
 
   const connect = useCallback(() => {
@@ -603,8 +603,13 @@ export default function PartyGame() {
       if (socket?.connected) {
         const sequence = inputSequenceRef.current + 1
         inputSequenceRef.current = sequence
-        socket.emit('client_message', { type: 'input', input: localInputRef.current, sequence })
-        localInputListenerRef.current?.(localPlayerId, localInputRef.current, sequence)
+        socket.emit('client_message', {
+          type: 'input',
+          input: localInputRef.current,
+          sequence,
+          jumpPressed: false,
+        })
+        localInputListenerRef.current?.(localPlayerId, localInputRef.current, sequence, false)
       }
     }, GAME_STATE_RENDER_INTERVAL_MS)
     return () => window.clearInterval(timer)
@@ -632,7 +637,7 @@ export default function PartyGame() {
       if (!key) return
       event.preventDefault()
       if (localInputRef.current[key]) return
-      updateLocalInput({ ...localInputRef.current, [key]: true })
+      updateLocalInput({ ...localInputRef.current, [key]: true }, key === 'jump')
     }
     const onKeyUp = (event: KeyboardEvent) => {
       const key = keyMap[event.key] || keyMap[event.code]

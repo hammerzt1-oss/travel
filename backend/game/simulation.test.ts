@@ -95,7 +95,7 @@ wallJumpPlayer.onGround = false
 wallJumpPlayer.onWall = true
 // -1 means the contacted wall is on the right, so the jump impulse goes left.
 wallJumpPlayer.wallDirection = -1
-wallJumpSimulation.setInput('wall-jump', { left: false, right: false, jump: true })
+wallJumpSimulation.setInput('wall-jump', { left: false, right: false, jump: true }, undefined, true)
 for (let index = 0; index < 5; index += 1) wallJumpSimulation.tick(0.017)
 assert.equal(wallJumpPlayer.jumpConsumed, false)
 assert.ok(wallJumpPlayer.velocityY > 0)
@@ -127,7 +127,7 @@ const openingJumpSimulation = new GameSimulation(
 const openingJumpPlayer = openingJumpSimulation.players.get('opening-jump')
 assert.ok(openingJumpPlayer)
 assert.equal(openingJumpPlayer.onGround, true)
-openingJumpSimulation.setInput('opening-jump', { left: false, right: false, jump: true })
+openingJumpSimulation.setInput('opening-jump', { left: false, right: false, jump: true }, undefined, true)
 openingJumpSimulation.tick(1 / 60)
 assert.equal(openingJumpPlayer.jumpConsumed, true)
 assert.ok(openingJumpPlayer.velocityY < 0)
@@ -143,10 +143,37 @@ const inputSequenceSimulation = new GameSimulation(
 )
 inputSequenceSimulation.setInput('input-sequence', { left: false, right: true, jump: false }, 7)
 inputSequenceSimulation.setInput('input-sequence', { left: true, right: false, jump: false }, 6)
+assert.equal(inputSequenceSimulation.snapshot('PLAYING').players[0].lastProcessedInputSequence, 0)
 inputSequenceSimulation.tick(1 / 60)
 const inputSequenceSnapshot = inputSequenceSimulation.snapshot('PLAYING').players[0]
 assert.equal(inputSequenceSnapshot.lastProcessedInputSequence, 7)
 assert.ok(inputSequenceSnapshot.velocityX > 0)
+
+// A held jump and its release are not new jump commands. Only the press edge
+// from sequence 1 may launch the player; the player must remain grounded after
+// that arc completes until another jumpPressed=true packet arrives.
+const jumpEdgeSimulation = new GameSimulation(
+  1,
+  [{ id: 'jump-edge', slot: 1, label: 'Player 1', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const jumpEdgePlayer = jumpEdgeSimulation.players.get('jump-edge')
+assert.ok(jumpEdgePlayer)
+jumpEdgeSimulation.setInput('jump-edge', { left: false, right: false, jump: true }, 1, true)
+jumpEdgeSimulation.tick(1 / 60)
+assert.equal(jumpEdgePlayer.jumpConsumed, true)
+for (let sequence = 2; sequence <= 30; sequence += 1) {
+  jumpEdgeSimulation.setInput('jump-edge', { left: false, right: false, jump: true }, sequence, false)
+  jumpEdgeSimulation.tick(1 / 60)
+}
+jumpEdgeSimulation.setInput('jump-edge', { left: false, right: false, jump: false }, 31, false)
+for (let index = 0; index < 100; index += 1) jumpEdgeSimulation.tick(1 / 60)
+assert.equal(jumpEdgePlayer.onGround, true)
+assert.equal(jumpEdgePlayer.velocityY, 0)
+for (let index = 0; index < 20; index += 1) jumpEdgeSimulation.tick(1 / 60)
+assert.equal(jumpEdgePlayer.onGround, true)
+assert.equal(jumpEdgePlayer.velocityY, 0)
 
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)

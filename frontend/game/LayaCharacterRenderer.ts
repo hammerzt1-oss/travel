@@ -248,15 +248,14 @@ export class LayaCharacterRenderer {
     }
   }
 
-  setLocalInput(playerId: string | null, input: PlayerInput, sequence?: number) {
+  setLocalInput(playerId: string | null, input: PlayerInput, sequence?: number, jumpPressed = false) {
     if (this.disposed) return
     const now = performance.now()
     this.advanceLocalPrediction(now)
-    const previous = this.localInput
     this.localPlayerId = playerId
     this.localInput = { ...input }
     if (sequence !== undefined) this.localInputSequence = Math.max(this.localInputSequence, sequence)
-    if (!playerId || !input.jump || previous.jump) return
+    if (!playerId || !jumpPressed) return
     const player = this.latestPlayers.get(playerId)
     const track = this.tracks.get(playerId)
     if (track && !track.localPrediction) {

@@ -168,7 +168,7 @@ export class RoomManager {
       case 'confirm_build':
         return this.confirmBuild(socketId)
       case 'input':
-        return this.setInput(socketId, message.input, message.sequence)
+        return this.setInput(socketId, message.input, message.sequence, message.jumpPressed)
       case 'return_to_room':
         return this.returnToRoom(socketId)
       case 'kick_player':
@@ -666,11 +666,11 @@ export class RoomManager {
     this.broadcastRoom(room)
   }
 
-  private setInput(socketId: string, input: PlayerInput, sequence: number) {
+  private setInput(socketId: string, input: PlayerInput, sequence: number, jumpPressed: boolean) {
     const context = this.context(socketId)
     if (!context || !context.room.simulation) return
     if (context.room.status !== 'PLAYING') return
-    context.room.simulation.setInput(context.player.id, clampInput(input), sequence)
+    context.room.simulation.setInput(context.player.id, clampInput(input), sequence, Boolean(jumpPressed))
   }
 
   private allConnectedPlayersPlaced(room: Room) {

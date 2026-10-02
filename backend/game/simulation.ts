@@ -44,6 +44,9 @@ type SimPlayer = {
   ready: boolean
   score: number
   input: PlayerInput
+  /** A queued jump edge. It is consumed once by the next physics tick. */
+  jumpPressed: boolean
+  pendingInputSequence: number
   lastProcessedInputSequence: number
   jumpConsumed: boolean
   jumpBufferUntil: number
@@ -883,6 +886,8 @@ export class GameSimulation {
             connected: true,
             ready: true,
             input: { left: false, right: false, jump: false },
+            jumpPressed: false,
+            pendingInputSequence: 0,
             lastProcessedInputSequence: 0,
             jumpConsumed: false,
             jumpBufferUntil: 0,
@@ -926,14 +931,20 @@ export class GameSimulation {
     if (player && player.alive && !player.finished) this.kill(player)
   }
 
-  setInput(playerId: string, input: PlayerInput, sequence = 0) {
+  setInput(playerId: string, input: PlayerInput, sequence?: number, jumpPressed = false) {
     const player = this.players.get(playerId)
     if (!player || !player.alive || player.finished) return
-    if (sequence < player.lastProcessedInputSequence) return
+    const nextSequence = sequence === undefined
+      ? player.pendingInputSequence + 1
+      : Number.isFinite(sequence)
+        ? Math.max(0, Math.floor(sequence))
+        : player.pendingInputSequence
+    if (nextSequence <= player.pendingInputSequence) return
     player.input = cloneInput(input)
-    player.lastProcessedInputSequence = Number.isFinite(sequence)
-      ? Math.max(0, Math.floor(sequence))
-      : player.lastProcessedInputSequence
+    player.pendingInputSequence = nextSequence
+    // Keep a press edge queued even when the following 33ms heartbeat has
+    // already released the button before the next physics tick.
+    if (jumpPressed) player.jumpPressed = true
   }
 
   tick(dt: number) {
@@ -944,6 +955,7 @@ export class GameSimulation {
     this.updateProjectiles(dt)
     for (const player of this.players.values()) {
       if (player.bot) this.updateBotInput(player)
+      player.lastProcessedInputSequence = player.pendingInputSequence
       this.tickPlayer(player, dt)
     }
     this.resolvePlayerCollision()
@@ -1127,8 +1139,11 @@ export class GameSimulation {
       }
     }
 
-    if (player.input.jump) player.jumpBufferUntil = this.elapsed + 0.2
-    else player.jumpConsumed = false
+    if (player.jumpPressed) {
+      player.jumpBufferUntil = this.elapsed + 0.2
+      player.jumpConsumed = false
+      player.jumpPressed = false
+    }
     if (player.jumpBufferUntil > this.elapsed && !player.jumpConsumed) {
       if (player.onGround) {
         player.velocityY = player.surfaceMaterial === 'mud'
