@@ -63,6 +63,10 @@ type PlayerTrack = {
     grounded: boolean
     jumpStartedAt: number | null
     serverAirborne: boolean
+    onWall: boolean
+    wallDirection: -1 | 1
+    fallingTime: number
+    extraHorizontalAirSpeed: number
     updatedAt: number
     correctionX: number
     correctionY: number
@@ -162,6 +166,7 @@ export class LayaCharacterRenderer {
   private readonly latestPlayers = new Map<string, PlayerSnapshot>()
   private readonly canvasTransformObserver: MutationObserver | null
   private latestState: GameState | null = null
+  private latestRound: number | null = null
   private latestScene: PartyScene | null = null
   private localPlayerId: string | null = null
   private localInput: PlayerInput = { left: false, right: false, jump: false }
@@ -229,6 +234,14 @@ export class LayaCharacterRenderer {
 
   update(state: GameState | null, scene: PartyScene | null) {
     if (this.disposed || !state || !scene) return
+    if (this.latestRound !== null && this.latestRound !== state.round) {
+      // The server constructs a fresh simulation at every round boundary.
+      // Reset both samples and the client sequence so the old finish position
+      // cannot be predicted or reconciled into the new spawn.
+      this.tracks.clear()
+      this.localInputSequence = 0
+    }
+    this.latestRound = state.round
     const receivedAt = performance.now()
     this.latestState = state
     this.latestScene = scene
@@ -269,12 +282,25 @@ export class LayaCharacterRenderer {
     // The input edge must not wait for the next authoritative animation
     // packet. On mobile that packet can still say "fall" for one frame after
     // the feet have landed, which used to swallow a perfectly valid jump.
-    if (prediction.grounded || player.animationState === 'idle' || player.animationState === 'run') {
+    const wallClinging = !prediction.grounded && prediction.onWall && prediction.fallingTime > 0.085 && prediction.velocityY >= 0
+    if (wallClinging) {
+      prediction.velocityY = PDZZ_PHYSICS.playerDerived.wallJumpStartVerticalVelocity
+      prediction.extraHorizontalAirSpeed = prediction.wallDirection * PDZZ_PHYSICS.playerDerived.wallJumpStartHorizontalVelocity
+      prediction.onWall = false
+      prediction.fallingTime = 0
+      prediction.jumping = true
+      prediction.grounded = false
+      prediction.jumpStartedAt = now
+      prediction.serverAirborne = false
+      prediction.updatedAt = now
+    } else if (prediction.grounded || player.animationState === 'idle' || player.animationState === 'run') {
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity
       prediction.jumping = true
       prediction.grounded = false
       prediction.jumpStartedAt = now
       prediction.serverAirborne = false
+      prediction.onWall = false
+      prediction.fallingTime = 0
       prediction.updatedAt = now
     }
   }
@@ -441,6 +467,10 @@ export class LayaCharacterRenderer {
       grounded: player.animationState === 'idle' || player.animationState === 'run',
       jumpStartedAt: null,
       serverAirborne: player.animationState === 'jump' || player.animationState === 'fall',
+      onWall: false,
+      wallDirection: 1 as const,
+      fallingTime: 0,
+      extraHorizontalAirSpeed: 0,
       updatedAt: receivedAt,
       correctionX: 0,
       correctionY: 0,
@@ -461,24 +491,43 @@ export class LayaCharacterRenderer {
     prediction.y += prediction.correctionY * correctionBlend
     prediction.correctionX *= 1 - correctionBlend
     prediction.correctionY *= 1 - correctionBlend
-    const horizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
-    const targetVelocity = horizontal * PDZZ_PHYSICS.player.normalHorizontalSpeed
-    const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
-    if (horizontal !== 0) {
-      prediction.velocityX = this.approach(prediction.velocityX, targetVelocity, acceleration)
+    const wasGrounded = prediction.grounded
+    if (wasGrounded) {
+      prediction.fallingTime = 0
+      if (prediction.velocityY >= 0) prediction.extraHorizontalAirSpeed = 0
+    } else if (prediction.velocityY > 0) {
+      prediction.fallingTime += dt
     } else {
-      prediction.velocityX = 0
+      prediction.fallingTime = 0
+    }
+    const wallClinging = !wasGrounded && prediction.onWall && prediction.fallingTime > 0.085 && prediction.velocityY >= 0
+    if (wallClinging && prediction.extraHorizontalAirSpeed * prediction.wallDirection < 0) {
+      prediction.extraHorizontalAirSpeed = 0
+    }
+    const horizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
+    const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
+    let inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
+    if (horizontal !== 0) {
+      inputVelocityX = this.approach(
+        inputVelocityX,
+        horizontal * PDZZ_PHYSICS.player.normalHorizontalSpeed,
+        acceleration,
+      )
+    } else {
+      inputVelocityX = 0
     }
     const previousX = prediction.x
     const previousY = prediction.y
-    let deltaX = prediction.velocityX * dt
+    let deltaX = 0
     let deltaY = 0
-    if (prediction.jumping || !prediction.grounded) {
-      const gravity = this.localInput.jump
-        ? PDZZ_PHYSICS.playerDerived.gravity
-        : PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.jumpUpGravityVariation
+    if (prediction.jumping || !wasGrounded) {
+      const gravity = wallClinging
+        ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.wallGravityVariation
+        : prediction.fallingTime > 0
+          ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.fallGravityVariation
+          : PDZZ_PHYSICS.playerDerived.gravity * (this.localInput.jump ? 1 : PDZZ_PHYSICS.player.jumpUpGravityVariation)
       prediction.velocityY = Math.min(
-        PDZZ_PHYSICS.player.maxFallSpeed,
+        wallClinging ? PDZZ_PHYSICS.player.maxWallSlideSpeed : PDZZ_PHYSICS.player.maxFallSpeed,
         prediction.velocityY + gravity * dt,
       )
       deltaY = prediction.velocityY * dt
@@ -486,36 +535,46 @@ export class LayaCharacterRenderer {
       prediction.velocityY = 0
     }
 
+    prediction.extraHorizontalAirSpeed = this.approach(
+      prediction.extraHorizontalAirSpeed,
+      0,
+      PDZZ_PHYSICS.playerDerived.wallJumpAirHorizontalForce * dt,
+    )
+    prediction.velocityX = inputVelocityX + prediction.extraHorizontalAirSpeed
+    deltaX = prediction.velocityX * dt
+
     const platforms = (this.latestState?.level.platforms ?? []).filter((platform) => !platform.oneWay)
     let nextX = previousX + deltaX
     let nextY = previousY + deltaY
     let landed = false
     let hitCeiling = false
+    let hitLeft = false
+    let hitRight = false
     for (const platform of platforms) {
       const sweptTop = Math.min(previousY, nextY)
       const sweptBottom = Math.max(previousY, nextY) + LOCAL_PLAYER_HEIGHT
       const verticalOverlap = sweptBottom > platform.y && sweptTop < platform.y + platform.height
       if (!verticalOverlap) continue
       if (
-        deltaX > 0 &&
-        previousX + LOCAL_PLAYER_WIDTH <= platform.x &&
-        nextX + LOCAL_PLAYER_WIDTH > platform.x &&
+        deltaX >= 0 &&
+        previousX + LOCAL_PLAYER_WIDTH <= platform.x + 1 &&
+        nextX + LOCAL_PLAYER_WIDTH >= platform.x &&
         nextY < platform.y + platform.height &&
         nextY + LOCAL_PLAYER_HEIGHT > platform.y
       ) {
         nextX = platform.x - LOCAL_PLAYER_WIDTH
         deltaX = 0
-        prediction.velocityX = 0
+        hitRight = true
       } else if (
-        deltaX < 0 &&
-        previousX >= platform.x + platform.width &&
-        nextX < platform.x + platform.width &&
+        deltaX <= 0 &&
+        previousX >= platform.x + platform.width - 1 &&
+        nextX <= platform.x + platform.width &&
         nextY < platform.y + platform.height &&
         nextY + LOCAL_PLAYER_HEIGHT > platform.y
       ) {
         nextX = platform.x + platform.width
         deltaX = 0
-        prediction.velocityX = 0
+        hitLeft = true
       }
     }
     for (const platform of platforms) {
@@ -546,6 +605,8 @@ export class LayaCharacterRenderer {
       prediction.grounded = true
       prediction.jumping = false
       prediction.jumpStartedAt = null
+      prediction.onWall = false
+      prediction.fallingTime = 0
     } else if (hitCeiling) {
       prediction.grounded = false
       prediction.jumping = true
@@ -559,6 +620,13 @@ export class LayaCharacterRenderer {
         prediction.grounded = false
         prediction.jumping = true
       }
+    }
+    if (!prediction.grounded) {
+      prediction.onWall = hitLeft || hitRight
+      if (hitLeft) prediction.wallDirection = 1
+      if (hitRight) prediction.wallDirection = -1
+    } else {
+      prediction.onWall = false
     }
     prediction.updatedAt = now
   }

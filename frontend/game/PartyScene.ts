@@ -121,6 +121,8 @@ export class PartyScene extends Phaser.Scene {
   private renderedMapId: string | null = null
   private renderedMapAssetsReady = false
   private nextMapAssetProbeAt = 0
+  private finishFlag?: Phaser.GameObjects.Image
+  private finishFlagFrame = -1
   private gridGraphics?: Phaser.GameObjects.Graphics
   private buildStartLabel?: Phaser.GameObjects.Text
   private trapSprites = new Map<string, Phaser.GameObjects.Container>()
@@ -401,6 +403,7 @@ export class PartyScene extends Phaser.Scene {
         animated.frame = frameNumber
       }
     }
+    this.updateFinishFlag(time)
     if (this.currentState && time >= this.nextTrapAnimationProbeAt) {
       this.nextTrapAnimationProbeAt = time + 100
       this.drawPlacedTraps(this.currentState, this.currentBuild)
@@ -417,6 +420,14 @@ export class PartyScene extends Phaser.Scene {
     build: BuildState | null = null,
     countdown: number | null = null,
   ) {
+    const roundChanged = Boolean(this.currentState && state && this.currentState.round !== state.round)
+    if (roundChanged) {
+      // A new authoritative simulation starts at the map spawn. Do not
+      // interpolate the previous round's finish position into this round.
+      this.localRenderPosition = null
+      this.playerTargets.clear()
+      this.lastStatus = null
+    }
     this.currentState = state
     this.currentBuild = build
     this.localPlayerId = localPlayerId
@@ -436,6 +447,7 @@ export class PartyScene extends Phaser.Scene {
     const state = this.currentState
     if (!state) return
     this.drawLevel(state)
+    this.drawFinishFlag(state)
     this.drawPlacedTraps(state, this.currentBuild)
     const buildSignature = JSON.stringify({ status: state.status, build: this.currentBuild })
     if (buildSignature !== this.lastRenderedBuildSignature) {
@@ -466,6 +478,9 @@ export class PartyScene extends Phaser.Scene {
     ) return
     for (const decoration of this.worldDecorations) decoration.destroy()
     for (const platform of this.worldPlatforms) platform.destroy()
+    this.finishFlag?.destroy()
+    this.finishFlag = undefined
+    this.finishFlagFrame = -1
     this.animatedMapSprites = []
     this.worldDecorations = []
     this.worldPlatforms = []
@@ -601,6 +616,42 @@ export class PartyScene extends Phaser.Scene {
     }
     this.renderedMapAssetsReady = mapAssetsReady
     if (mapAssetsReady) this.callbacks.onMapReady?.(state.level.mapId)
+  }
+
+  private drawFinishFlag(state: GameState) {
+    if (state.level.noFlag || !this.textures.exists('pdzz-game')) {
+      this.finishFlag?.destroy()
+      this.finishFlag = undefined
+      this.finishFlagFrame = -1
+      return
+    }
+    const frame = this.resolveAtlasFrame('pdzz-game', 'flag.png')
+    if (!frame) return
+    if (!this.finishFlag) {
+      // GoalArea.createFlag() uses the flag's bottom edge as its entity
+      // origin, with a 5% horizontal pivot. The authoritative trigger is
+      // 1.5 cells wide by 2 cells high around this same point.
+      this.finishFlag = this.add.image(state.level.finishX, state.level.finishY, 'pdzz-game', frame)
+        .setOrigin(0.05, 1)
+        .setDepth(3)
+      this.finishFlagFrame = 0
+    } else {
+      this.finishFlag.setPosition(state.level.finishX, state.level.finishY)
+    }
+  }
+
+  private updateFinishFlag(time: number) {
+    const state = this.currentState
+    if (!state || !this.finishFlag || state.level.noFlag) return
+    const frameIndex = Math.floor(time / 200) % 3
+    if (frameIndex === this.finishFlagFrame) return
+    const frame = this.resolveAtlasFrame(
+      'pdzz-game',
+      ['flag.png', 'flag1.png', 'flag2.png'][frameIndex],
+    )
+    if (!frame) return
+    this.finishFlag.setTexture('pdzz-game', frame)
+    this.finishFlagFrame = frameIndex
   }
 
   setPlayerFallbackVisible(playerId: string, visible: boolean) {

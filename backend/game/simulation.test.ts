@@ -214,10 +214,30 @@ assert.equal(jumpEdgePlayer.velocityY, 0)
 
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)
+// The goal is an AABB trigger around the authored flag point. Merely being
+// near the finish platform must not complete the round.
+haystackPlayer.x = 1740
+haystackPlayer.y = 1200
+haystackSimulation.tick(0.017)
+assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, false)
 haystackPlayer.x = 1800
 haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, true)
+
+// Every round creates a fresh simulation, so a player starts at the same
+// authored spawn point instead of carrying the previous round's finish pose.
+const secondRoundSimulation = new GameSimulation(
+  2,
+  [{ id: 'second-round', slot: 1, label: '棒尼', score: 110 }],
+  [],
+  'levelhaystack2',
+)
+const secondRoundPlayer = secondRoundSimulation.players.get('second-round')
+assert.ok(secondRoundPlayer)
+assert.equal(secondRoundPlayer.x, haystack.spawnX - 15)
+assert.equal(secondRoundPlayer.y, haystack.spawnY)
+assert.equal(secondRoundPlayer.finished, false)
 
 const outOfBoundsSimulation = new GameSimulation(
   1,
