@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { RoomManager, type RoomEvent } from './roomManager'
+import { PDZZ_LEAGUE_COMPONENT_IDS } from '../../shared/pdzzConfig'
 
 const events: RoomEvent[] = []
 const manager = new RoomManager((event) => events.push(event))
@@ -27,6 +28,12 @@ assert.match(host.roomId, /^\d{4}$/)
 const createdState = lastRoomState(host.roomId)
 assert.ok(createdState)
 assert.equal(createdState.state.players[0]?.ready, true)
+assert.equal(createdState.state.playerCollisionEnabled, false)
+
+manager.handle('socket-host', { type: 'set_player_collision', enabled: true })
+const collisionEnabledState = lastRoomState(host.roomId)
+assert.ok(collisionEnabledState)
+assert.equal(collisionEnabledState.state.playerCollisionEnabled, true)
 
 manager.handle('socket-host', { type: 'set_name', name: '房主昵称' })
 const renamedState = lastRoomState(host.roomId)
@@ -46,6 +53,19 @@ const joinedState = lastRoomState(host.roomId)
 assert.ok(joinedState)
 assert.equal(joinedState.state.status, 'WAITING')
 assert.equal(joinedState.state.players.length, 2)
+
+manager.handle('socket-second', { type: 'set_player_collision', enabled: false })
+const nonHostCollisionError = lastError('socket-second')
+assert.ok(nonHostCollisionError)
+assert.equal(nonHostCollisionError.code, 'NOT_HOST')
+const stillCollisionEnabledState = lastRoomState(host.roomId)
+assert.ok(stillCollisionEnabledState)
+assert.equal(stillCollisionEnabledState.state.playerCollisionEnabled, true)
+
+manager.handle('socket-host', { type: 'set_player_collision', enabled: false })
+const collisionDisabledState = lastRoomState(host.roomId)
+assert.ok(collisionDisabledState)
+assert.equal(collisionDisabledState.state.playerCollisionEnabled, false)
 
 const thirdPlayer = manager.handle('socket-third', { type: 'random_join' })
 const fourthPlayer = manager.handle('socket-fourth', { type: 'random_join' })
@@ -86,6 +106,9 @@ function placementRoomState() {
 
 let placementState = placementRoomState()
 assert.equal(placementState?.status, 'BUILDING')
+assert.equal(placementState?.buildState?.options.length, 6)
+assert.equal(new Set(placementState?.buildState?.options.map((option) => option.id)).size, 6)
+assert.ok(placementState?.buildState?.options.every((option) => PDZZ_LEAGUE_COMPONENT_IDS.includes(option.id as typeof PDZZ_LEAGUE_COMPONENT_IDS[number])))
 const firstOption = placementState?.buildState?.options[0]
 assert.ok(firstOption)
 placementManager.handle('placement-host', { type: 'select_trap', trapId: firstOption.id })

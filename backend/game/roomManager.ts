@@ -23,6 +23,8 @@ import {
   TRAP_DEFINITIONS,
 } from './simulation'
 import {
+  PDZZ_LEAGUE_COMPONENT_GUIDE_BY_ID,
+  PDZZ_LEAGUE_COMPONENT_IDS,
   PDZZ_LEAGUE_MAP_IDS,
   getPdzzCharacterForSlot,
 } from '../../shared/pdzzConfig'
@@ -58,6 +60,7 @@ export type Session = {
 type Room = {
   roomId: string
   hostId: string
+  playerCollisionEnabled: boolean
   status: RoomStatus
   round: number
   players: Map<string, RoomPlayerState>
@@ -114,22 +117,24 @@ function isRotation(value: unknown): value is Rotation {
   return value === 0 || value === 90 || value === 180 || value === 270
 }
 
-const FIXED_LEAGUE_TRAP_IDS = [
-  'fortunecat',
-  'gas',
-  'triggerhazard',
-  'spike3x1',
-  'mud',
-  'triggerspikes',
-] as const
-
 function makeOptions() {
-  // Temporary league test pool. Keep the order stable while these six APK
-  // components are validated against the extracted runtime behavior.
-  return FIXED_LEAGUE_TRAP_IDS.map((id) => {
+  // The APK keeps a candidate pool, then generatePartyComponents() picks six
+  // unique entries for each round. Keep the extracted league pool available to the guide while
+  // exposing the same six-card build selection shown by the original match.
+  const ids = [...PDZZ_LEAGUE_COMPONENT_IDS]
+  for (let index = ids.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    ;[ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]]
+  }
+  return ids.slice(0, 6).map((id) => {
     const definition = TRAP_DEFINITIONS.find((item) => item.id === id)
-    if (!definition) throw new Error(`Missing fixed league trap definition: ${id}`)
-    return { ...definition, claimedBy: null as string | null }
+    if (!definition) throw new Error(`Missing league trap definition: ${id}`)
+    const guide = PDZZ_LEAGUE_COMPONENT_GUIDE_BY_ID[id]
+    return {
+      ...definition,
+      description: `${guide.functionText} ${guide.configuration}`,
+      claimedBy: null as string | null,
+    }
   })
 }
 
@@ -155,6 +160,8 @@ export class RoomManager {
         return this.setReady(socketId)
       case 'select_map':
         return this.selectMap(socketId, message.mapId)
+      case 'set_player_collision':
+        return this.setPlayerCollision(socketId, message.enabled)
       case 'start_game':
         return this.startGame(socketId)
       case 'select_trap':
@@ -265,6 +272,7 @@ export class RoomManager {
     const room: Room = {
       roomId,
       hostId: playerId,
+      playerCollisionEnabled: false,
       status: 'READY',
       round: 1,
       players: new Map([
@@ -455,6 +463,18 @@ export class RoomManager {
     this.broadcastRoom(room)
   }
 
+  private setPlayerCollision(socketId: string, enabled: boolean) {
+    const context = this.context(socketId)
+    if (!context) return
+    const { room, player } = context
+    if (room.hostId !== player.id) return this.fail(socketId, 'NOT_HOST', '只有房主可以修改玩家碰撞设置')
+    if (room.status !== 'WAITING' && room.status !== 'READY') {
+      return this.fail(socketId, 'INVALID_PHASE', '只有等待房间可以修改玩家碰撞设置')
+    }
+    room.playerCollisionEnabled = Boolean(enabled)
+    this.broadcastRoom(room)
+  }
+
   private beginBuild(room: Room) {
     const players = Array.from(room.players.values()).sort((a, b) => a.slot - b.slot)
     const simulationPlayers = players.map((item) => ({
@@ -500,6 +520,7 @@ export class RoomManager {
       simulationPlayers,
       room.placedTraps,
       room.activeMapId,
+      room.playerCollisionEnabled,
     )
     this.broadcastRoom(room)
   }
@@ -871,6 +892,7 @@ export class RoomManager {
     return {
       roomId: room.roomId,
       hostId: room.hostId,
+      playerCollisionEnabled: room.playerCollisionEnabled,
       status: room.status,
       round: room.round,
       players: Array.from(room.players.values()).map(({ reconnectToken, socketId, disconnectedAt, ...player }) => player),

@@ -65,6 +65,9 @@ type SimPlayer = {
   gasExitUntil: number
   freezeUntil: number
   lowGravityUntil: number
+  inIce: boolean
+  inMud: boolean
+  springJump: boolean
   bot: boolean
 }
 
@@ -461,20 +464,50 @@ function isOneWayComponent(trapId: string) {
   return trapId === 'onewayplatform' || trapId === 'onewayplatformstatic' || trapId === 'onewayblock'
 }
 
+const LINEAR_SAW_SPEED = PDZZ_PHYSICS.componentMechanics.linearSaw.speed
+const LINEAR_SAW_MAX_OFFSET = PDZZ_PHYSICS.componentMechanics.linearSaw.travelPixels
+const LINEAR_SAW_SPIN_DEGREES_PER_SECOND = PDZZ_PHYSICS.componentMechanics.linearSaw.spinDegreesPerSecond
+
+function linearSawPingPong(elapsed: number) {
+  // APK Cf mover: pingPong(elapsed * speed / offset, 1), then sineInOut.
+  const cycle = ((elapsed * LINEAR_SAW_SPEED / LINEAR_SAW_MAX_OFFSET) % 2 + 2) % 2
+  const pingPong = cycle <= 1 ? cycle : 2 - cycle
+  return 0.5 - 0.5 * Math.cos(Math.PI * pingPong)
+}
+
+function linearSawMotion(trap: PlacedTrap, elapsed: number) {
+  const offset = linearSawPingPong(elapsed) * LINEAR_SAW_MAX_OFFSET
+  const spin = (elapsed * LINEAR_SAW_SPIN_DEGREES_PER_SECOND) % 360
+  switch (trap.rotation) {
+    case 90:
+      return { x: 45, y: -100 + offset, rotation: 90 + spin }
+    case 180:
+      return { x: 100 - offset, y: 45, rotation: 180 + spin }
+    case 270:
+      return { x: -45, y: 100 - offset, rotation: -90 + spin }
+    default:
+      return { x: -100 + offset, y: -45, rotation: spin }
+  }
+}
+
 function trapMotion(trap: PlacedTrap, elapsed: number) {
-  const movingHorizontal = new Set(['moveplatform1x1', 'moveplatform2x1', 'moveplatform3x1', 'trackplatform', 'onedirblock', 'linearsaw'])
+  const movingHorizontal = new Set(['moveplatform1x1', 'moveplatform2x1', 'moveplatform3x1', 'trackplatform', 'onedirblock'])
   const movingVertical = new Set(['doublelift', 'stomper', 'crumblingblock'])
   const rotating = new Set(['swingplatform', 'spinningplatform', 'spikeball', 'rotaryhazard', 'squaredplatform', 'spinningsaw', 'swingsaw'])
   const phase = (trap.placedRound * 0.71 + trap.x * 0.13 + trap.y * 0.17) % (Math.PI * 2)
   const wave = Math.sin(elapsed * (Math.PI * 2 / 3.6) + phase)
+  const saw = trap.trapId === 'linearsaw' ? linearSawMotion(trap, elapsed) : null
   return {
     offsetX: movingHorizontal.has(trap.trapId)
-      ? trap.trapId === 'linearsaw' ? wave * 250 : wave * 150
+      ? wave * 150
       : 0,
     offsetY: movingVertical.has(trap.trapId) ? Math.max(0, wave) * 150 : 0,
     visualRotation: rotating.has(trap.trapId)
       ? trap.rotation + (trap.trapId === 'swingsaw' ? wave * 60 : wave * 25)
       : trap.rotation,
+    movingOffsetX: saw?.x ?? 0,
+    movingOffsetY: saw?.y ?? 0,
+    movingRotation: saw?.rotation ?? trap.rotation,
   }
 }
 
@@ -535,6 +568,16 @@ function trapCellRects(
   }))
 }
 
+function trapOccupiedBounds(trap: PlacedTrap, elapsed: number) {
+  const cells = trapCellRects(trap, elapsed)
+  if (cells.length === 0) return null
+  const left = Math.min(...cells.map((cell) => cell.x))
+  const top = Math.min(...cells.map((cell) => cell.y))
+  const right = Math.max(...cells.map((cell) => cell.x + cell.width))
+  const bottom = Math.max(...cells.map((cell) => cell.y + cell.height))
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
 type TrapRect = { x: number; y: number; width: number; height: number }
 
 function trapEntityCenter(trap: PlacedTrap, elapsed: number) {
@@ -542,6 +585,15 @@ function trapEntityCenter(trap: PlacedTrap, elapsed: number) {
   return {
     x: trap.x * CELL_SIZE + (trap.width * CELL_SIZE) / 2 + motion.offsetX,
     y: trap.y * CELL_SIZE + (trap.height * CELL_SIZE) / 2 + motion.offsetY,
+  }
+}
+
+function linearSawWorldCenter(trap: PlacedTrap, elapsed: number) {
+  const center = trapEntityCenter(trap, elapsed)
+  const motion = trapMotion(trap, elapsed)
+  return {
+    x: center.x + motion.movingOffsetX,
+    y: center.y + motion.movingOffsetY,
   }
 }
 
@@ -582,9 +634,10 @@ function fortuneCatTriggerRect(trap: PlacedTrap, elapsed: number) {
 
 function fortuneCatHazardRect(trap: PlacedTrap, elapsed: number) {
   const center = trapEntityCenter(trap, elapsed)
-  const definition = trapDefinition('fortunecat')
-  const localPlatformHeight = (definition?.height ?? 2) * CELL_SIZE
-  return orientedRect(center.x, center.y, 2.6 * CELL_SIZE, 0.5 * CELL_SIZE, 0, 0.2 * localPlatformHeight, trap.rotation)
+  // Ov's source code uses `0.2 * gridHeight` for the hazard offset. The
+  // component is two cells tall, so this is 20px / 0.4 authored cell.
+  const componentHeight = (trapDefinition('fortunecat')?.height ?? 2) * CELL_SIZE
+  return orientedRect(center.x, center.y, 2.6 * CELL_SIZE, 0.5 * CELL_SIZE, 0, 0.2 * componentHeight, trap.rotation)
 }
 
 function bounceIn(value: number) {
@@ -671,6 +724,7 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
       case 'gas':
         return { ...cell, x: x - 0.5 * CELL_SIZE, y: y - 0.5 * CELL_SIZE, width: 2 * CELL_SIZE, height: 2 * CELL_SIZE }
       case 'linearsaw':
+        return { ...cell }
       case 'spinningsaw':
       case 'swingsaw':
         return { ...cell, x: x + 5, y: y + 5, width: 40, height: 40 }
@@ -679,6 +733,43 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
     }
   })
   return rects
+}
+
+function springSpikesHazardRect(trap: PlacedTrap, elapsed: number): TrapRect | null {
+  const bounds = trapOccupiedBounds(trap, elapsed)
+  if (!bounds) return null
+  const inset = 5
+  const thickness = CELL_SIZE * 0.4
+  switch (trap.rotation) {
+    case 90:
+      return {
+        x: bounds.x + bounds.width,
+        y: bounds.y + inset,
+        width: thickness,
+        height: Math.max(0, bounds.height - inset * 2),
+      }
+    case 180:
+      return {
+        x: bounds.x + inset,
+        y: bounds.y + bounds.height,
+        width: Math.max(0, bounds.width - inset * 2),
+        height: thickness,
+      }
+    case 270:
+      return {
+        x: bounds.x - thickness,
+        y: bounds.y + inset,
+        width: thickness,
+        height: Math.max(0, bounds.height - inset * 2),
+      }
+    default:
+      return {
+        x: bounds.x + inset,
+        y: bounds.y - thickness,
+        width: Math.max(0, bounds.width - inset * 2),
+        height: thickness,
+      }
+  }
 }
 
 function trapActivationRect(trap: PlacedTrap, elapsed: number) {
@@ -824,6 +915,7 @@ export class GameSimulation {
   readonly round: number
   readonly players: Map<string, SimPlayer>
   readonly level: LevelSnapshot
+  readonly playerCollisionEnabled: boolean
   private placedTraps: PlacedTrap[]
   private elapsed = 0
   private projectiles: Projectile[] = []
@@ -833,6 +925,13 @@ export class GameSimulation {
   private crumbleStartedAt = new Map<string, number>()
   private finishTriggerOccupants = new Set<string>()
   private trapActivationAt = new Map<string, number>()
+  /** Gas keeps an entered player in its inner-state until the outer box exits. */
+  private gasOccupants = new Set<string>()
+  /** Ice and mud are maintained by trigger enter/exit, like the APK model. */
+  private iceOccupants = new Set<string>()
+  private mudOccupants = new Set<string>()
+  /** Trigger components fire on enter; staying inside must not retrigger them. */
+  private trapTriggerOccupants = new Set<string>()
   private readonly aiPaths = new Map<string, Array<{ x: number; y: number; jump: boolean }>>()
 
   constructor(
@@ -848,8 +947,10 @@ export class GameSimulation {
     }>,
     placedTraps: PlacedTrap[],
     mapId: string | null = null,
+    playerCollisionEnabled = false,
   ) {
     this.round = round
+    this.playerCollisionEnabled = Boolean(playerCollisionEnabled)
     this.level = levelForMap(mapId)
     this.placedTraps = placedTraps.map((trap) => ({ ...trap }))
     this.players = new Map(
@@ -905,6 +1006,9 @@ export class GameSimulation {
             gasExitUntil: 0,
             freezeUntil: 0,
             lowGravityUntil: 0,
+            inIce: false,
+            inMud: false,
+            springJump: false,
           } satisfies SimPlayer,
         ]
       }),
@@ -952,6 +1056,8 @@ export class GameSimulation {
     this.elapsed = Math.min(PLAY_DURATION_SECONDS, this.elapsed + dt)
     this.updateSwitches()
     this.updateTrapStates()
+    this.updateSurfaceStates()
+    this.updateGasStates()
     this.updateProjectiles(dt)
     for (const player of this.players.values()) {
       if (player.bot) this.updateBotInput(player)
@@ -1065,21 +1171,12 @@ export class GameSimulation {
 
     const previousX = player.x
     const previousY = player.y
-    // Mud is a grounded surface effect in the APK. It changes horizontal
-    // speed, jump impulse, and wall-slide gravity only while the foot is on
-    // the mud trigger, not merely while the body overlaps its cell.
-    player.surfaceMaterial = player.iceUntil > this.elapsed ? 'ice' : 'normal'
-    for (const trap of this.placedTraps) {
-      if (trap.trapId !== 'mud') continue
-      const mudRect = trapTriggerRects(trap, this.elapsed)[0]
-      if (mudRect && player.onGround && overlaps(
-        player.x + 4, player.y + PLAYER_HEIGHT - 4, PLAYER_WIDTH - 8, 8,
-        mudRect.x, mudRect.y, mudRect.width, mudRect.height,
-      )) {
-        player.surfaceMaterial = 'mud'
-        break
-      }
-    }
+    // The APK separates "inside the trigger" from "grounded on the face".
+    // Ice/mud can affect wall physics while airborne, but their horizontal
+    // speed and jump start only apply when the foot is on an upward surface.
+    const groundedIce = player.onGround && this.hasGroundedSurfaceContact(player, 'ice')
+    const groundedMud = player.onGround && this.hasGroundedSurfaceContact(player, 'mud')
+    player.surfaceMaterial = groundedIce ? 'ice' : groundedMud ? 'mud' : 'normal'
     const inputHorizontal = (player.input.right ? 1 : 0) - (player.input.left ? 1 : 0)
     const horizontal = player.reverseUntil > this.elapsed ? -inputHorizontal : inputHorizontal
     const previousExtraHorizontalAirSpeed = player.extraHorizontalAirSpeed
@@ -1111,9 +1208,9 @@ export class GameSimulation {
       player.extraHorizontalAirSpeed = 0
     } else {
       const speed =
-        player.surfaceMaterial === 'ice' || player.iceUntil > this.elapsed
+        player.surfaceMaterial === 'ice'
           ? PHYSICS.player.iceHorizontalSpeed
-          : player.surfaceMaterial === 'mud' || player.slowUntil > this.elapsed
+          : player.surfaceMaterial === 'mud'
             ? PHYSICS.player.mudHorizontalSpeed
             : player.boostUntil > this.elapsed
               ? PHYSICS.player.normalHorizontalSpeed * 1.68
@@ -1125,7 +1222,7 @@ export class GameSimulation {
           PHYSICS.player.horizontalInputAcceleration * dt,
         )
         player.direction = horizontal as -1 | 1
-      } else if (player.surfaceMaterial === 'ice' || player.iceUntil > this.elapsed) {
+      } else if (player.surfaceMaterial === 'ice') {
         // Ice retains momentum, but the source controller applies 0.2x
         // acceleration as friction when horizontal input is released.
         inputVelocityX = approach(
@@ -1146,6 +1243,7 @@ export class GameSimulation {
     }
     if (player.jumpBufferUntil > this.elapsed && !player.jumpConsumed) {
       if (player.onGround) {
+        player.springJump = false
         player.velocityY = player.surfaceMaterial === 'mud'
           ? PHYSICS.playerDerived.mudJumpStartVelocity
           : PHYSICS.playerDerived.normalJumpStartVelocity
@@ -1153,8 +1251,10 @@ export class GameSimulation {
         player.jumpBufferUntil = 0
         player.jumpConsumed = true
       } else if (wallClinging) {
-        player.velocityY = PHYSICS.playerDerived.wallJumpStartVerticalVelocity
-        player.extraHorizontalAirSpeed = player.wallDirection * PHYSICS.playerDerived.wallJumpStartHorizontalVelocity
+        player.springJump = false
+        const wallJumpVariation = player.inMud ? 0.65 : 1
+        player.velocityY = PHYSICS.playerDerived.wallJumpStartVerticalVelocity * wallJumpVariation
+        player.extraHorizontalAirSpeed = player.wallDirection * PHYSICS.playerDerived.wallJumpStartHorizontalVelocity * wallJumpVariation
         player.direction = player.wallDirection
         player.jumpBufferUntil = 0
         player.jumpConsumed = true
@@ -1168,22 +1268,28 @@ export class GameSimulation {
       ? PHYSICS.playerDerived.gravity * 0.22
       : wallClinging
         ? PHYSICS.playerDerived.gravity * (
-          player.surfaceMaterial === 'ice'
+          player.inIce
             ? PHYSICS.player.iceWallGravityVariation
-            : player.surfaceMaterial === 'mud'
+            : player.inMud
               ? PHYSICS.player.mudWallGravityVariation
               : PHYSICS.player.wallGravityVariation
         )
       : player.fallingTime > 0
         ? PHYSICS.playerDerived.gravity * PHYSICS.player.fallGravityVariation
-        : PHYSICS.playerDerived.gravity * (player.input.jump ? 1 : PHYSICS.player.jumpUpGravityVariation)
+        : PHYSICS.playerDerived.gravity * (
+          player.springJump
+            ? PHYSICS.player.springJumpUpGravityVariation
+            : player.input.jump
+              ? 1
+              : PHYSICS.player.jumpUpGravityVariation
+        )
     player.velocityY = clamp(
       player.velocityY + gravity * dt,
       PHYSICS.player.maxUpSpeed,
       wallClinging
-        ? player.surfaceMaterial === 'ice'
+        ? player.inIce
           ? PHYSICS.player.maxIceWallSlideSpeed
-          : player.surfaceMaterial === 'mud'
+          : player.inMud
             ? PHYSICS.player.maxMudWallSlideSpeed
             : PHYSICS.player.maxWallSlideSpeed
         : PHYSICS.player.maxFallSpeed,
@@ -1256,15 +1362,21 @@ export class GameSimulation {
       player.fallingTime = 0
       const landingPlatform = movement.surface as Surface | null
       player.supportId = landingPlatform?.trap?.instanceId ?? landingPlatform?.id ?? null
+      player.springJump = false
       player.surfaceMaterial = landingPlatform?.material ?? 'normal'
-      if (player.surfaceMaterial === 'ice') player.iceUntil = this.elapsed + 0.2
-      if (player.surfaceMaterial === 'mud') player.slowUntil = this.elapsed + 0.2
+      if (this.hasGroundedSurfaceContact(player, 'ice')) player.surfaceMaterial = 'ice'
+      else if (this.hasGroundedSurfaceContact(player, 'mud')) player.surfaceMaterial = 'mud'
       if (landingPlatform?.trap && landingPlatform.definition) {
         if (landingPlatform.trap.trapId === 'crumblingblock' && !this.crumbleStartedAt.has(landingPlatform.trap.instanceId)) {
           this.crumbleStartedAt.set(landingPlatform.trap.instanceId, this.elapsed)
         }
         if (landingPlatform.definition.collisionMode !== 'hybrid') {
-          this.applyTrapEffect(player, landingPlatform.trap, landingPlatform.definition.effect)
+          // vv only reacts to a collision normal matching its face. A top
+          // landing is therefore a spring hit only for the upward rotation.
+          if (landingPlatform.trap.trapId === 'spring' && landingPlatform.trap.rotation === 0) {
+            this.applySpringEffect(player, landingPlatform.trap)
+          }
+          else this.applyTrapEffect(player, landingPlatform.trap, landingPlatform.definition.effect)
         }
         if (!player.alive || player.finished) return
       }
@@ -1279,6 +1391,8 @@ export class GameSimulation {
     // thin collider at high speed, matching the source penetration pass.
     this.resolvePlatformWalls(player, previousX, previousY)
     this.resolveTrapWalls(player, previousX)
+    this.applySpringFromMovement(player, movement)
+    player.velocityX = inputVelocityX + player.extraHorizontalAirSpeed
 
     for (const hazard of this.level.hazards) {
       if (overlaps(player.x + 4, player.y + 5, PLAYER_WIDTH - 8, PLAYER_HEIGHT - 5, hazard.x, hazard.y, hazard.width, hazard.height)) {
@@ -1293,33 +1407,44 @@ export class GameSimulation {
       if (this.isTrapDisabled(trap)) continue
       const rects = this.trapHazardRects(trap)
       if (['cannon', 'crossbow', 'ballooncannon', 'lasershooter'].includes(trap.trapId)) continue
-      if (trap.trapId === 'gas') {
-        const gasCell = trapCellRects(trap, this.elapsed)[0]
-        if (gasCell) {
-          const inner = {
-            x: gasCell.x - CELL_SIZE * 0.25,
-            y: gasCell.y - CELL_SIZE * 0.25,
-            width: CELL_SIZE * 1.5,
-            height: CELL_SIZE * 1.5,
-          }
-          const outer = {
-            x: gasCell.x - CELL_SIZE * 0.5,
-            y: gasCell.y - CELL_SIZE * 0.5,
-            width: CELL_SIZE * 2,
-            height: CELL_SIZE * 2,
-          }
-          const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
-          if (overlaps(body.x, body.y, body.width, body.height, inner.x, inner.y, inner.width, inner.height)) {
-            player.reverseUntil = this.elapsed + 0.1
-            player.gasExitUntil = this.elapsed + 1.5
-          } else if (overlaps(body.x, body.y, body.width, body.height, outer.x, outer.y, outer.width, outer.height)) {
-            player.reverseUntil = Math.max(player.reverseUntil, player.gasExitUntil)
-          }
+      if (trap.trapId === 'gas') continue
+      if (trap.trapId === 'fortunecat' || trap.trapId === 'triggerhazard' || trap.trapId === 'triggerspikes') {
+        if (!this.isTrapHazardActive(trap)) continue
+      }
+      // Springs are solid platforms. Their effect is driven by the contacted
+      // collision face, so body overlap must not trigger them a second time.
+      if (trap.trapId === 'spring') continue
+      if (trap.trapId === 'spikeball') {
+        const center = trapEntityCenter(trap, this.elapsed)
+        if (circleOverlapsRect(
+          center.x,
+          center.y,
+          17.5,
+          player.x,
+          player.y,
+          PLAYER_WIDTH,
+          PLAYER_HEIGHT,
+        )) {
+          this.kill(player, trap.ownerId)
+          return
         }
         continue
       }
-      if (trap.trapId === 'fortunecat' || trap.trapId === 'triggerhazard' || trap.trapId === 'triggerspikes') {
-        if (!this.isTrapHazardActive(trap)) continue
+      if (trap.trapId === 'linearsaw') {
+        const center = linearSawWorldCenter(trap, this.elapsed)
+        if (circleOverlapsRect(
+          center.x,
+          center.y,
+          PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius,
+          player.x,
+          player.y,
+          PLAYER_WIDTH,
+          PLAYER_HEIGHT,
+        )) {
+          this.kill(player, trap.ownerId)
+          return
+        }
+        continue
       }
       for (const rect of rects) {
         const touchingTop =
@@ -1491,19 +1616,24 @@ export class GameSimulation {
     }
   }
 
-  private resolveTrapWalls(player: SimPlayer, previousX: number) {
+  private resolveTrapWalls(
+    player: SimPlayer,
+    previousX: number,
+  ) {
     for (const trap of this.placedTraps) {
       const definition = trapDefinition(trap.trapId)
       if (!definition || (definition.collisionMode !== 'solid' && definition.collisionMode !== 'hybrid') || isOneWayComponent(trap.trapId) || this.isTrapDisabled(trap)) continue
+      // The APK linearsaw base is a platform collider. The character
+      // controller already resolves its top face; a penetration correction
+      // here must not turn a top landing into a horizontal wall hit.
+      if (trap.trapId === 'linearsaw') continue
       for (const rect of trapCellRects(trap, this.elapsed)) {
         const trapX = rect.x
-        const trapY = rect.y
         const trapWidth = rect.width
-        const trapHeight = rect.height
-        if (!overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, trapX, trapY, trapWidth, trapHeight)) continue
+        if (!overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, trapX, rect.y, trapWidth, rect.height)) continue
         if (previousX + PLAYER_WIDTH <= trapX) {
           player.x = trapX - PLAYER_WIDTH
-        } else if (previousX >= trapX + trapWidth) {
+          } else if (previousX >= trapX + trapWidth) {
           player.x = trapX + trapWidth
         } else {
           player.x = player.x < trapX + trapWidth / 2 ? trapX - PLAYER_WIDTH : trapX + trapWidth
@@ -1511,6 +1641,67 @@ export class GameSimulation {
         player.velocityX = 0
       }
     }
+  }
+
+  private applySpringFromMovement(
+    player: SimPlayer,
+    movement: ReturnType<typeof moveCharacter>,
+  ) {
+    if (!movement.hitLeft && !movement.hitRight && !movement.hitCeiling) return
+    for (const trap of this.placedTraps) {
+      if (trap.trapId !== 'spring') continue
+      for (const rect of trapCellRects(trap, this.elapsed)) {
+        const verticalOverlap = player.y + PLAYER_HEIGHT > rect.y && player.y < rect.y + rect.height
+        const horizontalOverlap = player.x + PLAYER_WIDTH > rect.x && player.x < rect.x + rect.width
+        const touchedRightFace = movement.hitLeft && trap.rotation === 90 &&
+          Math.abs(player.x - (rect.x + rect.width)) <= 1
+        const touchedLeftFace = movement.hitRight && trap.rotation === 270 &&
+          Math.abs(player.x + PLAYER_WIDTH - rect.x) <= 1
+        const touchedBottomFace = movement.hitCeiling && trap.rotation === 180 &&
+          Math.abs(player.y - (rect.y + rect.height)) <= 1
+        if (
+          (touchedRightFace && verticalOverlap) ||
+          (touchedLeftFace && verticalOverlap) ||
+          (touchedBottomFace && horizontalOverlap)
+        ) {
+          this.applySpringEffect(player, trap)
+          return
+        }
+      }
+    }
+  }
+
+  private applySpringEffect(player: SimPlayer, trap: PlacedTrap) {
+    const cooldownUntil = player.trapCooldowns.get(trap.instanceId) ?? 0
+    if (cooldownUntil > this.elapsed) return
+
+    // vv in the APK derives its spring jump from a 1.5x jump height, then
+    // applies a direction-specific impulse from the contacted face.
+    const springVelocity = PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(
+      PHYSICS.componentMechanics.spring.jumpHeightMultiplier,
+    )
+    switch (trap.rotation) {
+      case 180:
+        player.velocityY = -springVelocity / 2
+        player.onGround = false
+        break
+      case 90:
+        player.extraHorizontalAirSpeed = -springVelocity * PHYSICS.componentMechanics.spring.triggerSpringVelocityMultiplier
+        player.onGround = false
+        break
+      case 270:
+        player.extraHorizontalAirSpeed = springVelocity
+        player.onGround = false
+        break
+      default:
+        player.y = Math.min(player.y, trapWorldRect(trap, this.elapsed).y - PLAYER_HEIGHT)
+        player.velocityY = springVelocity
+        player.springJump = true
+        player.onGround = false
+        break
+    }
+    player.supportId = null
+    player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.05)
   }
 
   private applyTrapEffect(player: SimPlayer, trap: PlacedTrap, effect: TrapEffect) {
@@ -1524,25 +1715,24 @@ export class GameSimulation {
         this.kill(player, trap.ownerId)
         return
       case 'ice':
-        player.iceUntil = this.elapsed + 0.9
-        if (player.input.left || player.input.right) {
-          player.velocityX = (player.input.right ? 1 : -1) * PHYSICS.player.iceHorizontalSpeed
-        }
+        // Maintained by updateSurfaceStates() until the trigger exit event.
         return
       case 'bounce':
-        player.y = Math.min(player.y, trapY - PLAYER_HEIGHT)
-        const springVelocity = PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(
-          PHYSICS.componentMechanics.spring.jumpHeightMultiplier,
-        )
-        player.velocityY = trap.trapId === 'triggerspring'
-          ? springVelocity * PHYSICS.componentMechanics.spring.triggerSpringVelocityMultiplier
-          : springVelocity
-        player.onGround = false
-        player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.55)
+        if (trap.trapId === 'spring') this.applySpringEffect(player, trap)
+        else {
+          player.y = Math.min(player.y, trapY - PLAYER_HEIGHT)
+          const springVelocity = PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(
+            PHYSICS.componentMechanics.spring.jumpHeightMultiplier,
+          )
+          player.velocityY = trap.trapId === 'triggerspring'
+            ? springVelocity * PHYSICS.componentMechanics.spring.triggerSpringVelocityMultiplier
+            : springVelocity
+          player.onGround = false
+          player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.55)
+        }
         return
       case 'slow':
-        player.slowUntil = this.elapsed + 0.2
-        if (player.surfaceMaterial !== 'mud') player.velocityX *= 0.35
+        // Maintained by updateSurfaceStates() until the trigger exit event.
         return
       case 'teleport':
         if (trap.trapId === 'portal') {
@@ -1645,7 +1835,7 @@ export class GameSimulation {
     const age = this.elapsed - started
     if (trap.trapId === 'triggerhazard') return cactusProgress(age) > 0.5
     if (trap.trapId === 'fortunecat') return age >= 0.8 && age < 1.8
-    if (trap.trapId === 'triggerspikes') return age >= 0.55 && age < 3.55
+    if (trap.trapId === 'triggerspikes') return age >= 0.55 && age < 3.6
     return false
   }
 
@@ -1657,6 +1847,10 @@ export class GameSimulation {
       const started = this.trapActivationAt.get(trap.instanceId)
       if (started === undefined) return []
       const rect = cactusHazardRect(trap, this.elapsed, this.elapsed - started)
+      return rect ? [rect] : []
+    }
+    if (trap.trapId === 'triggerspikes') {
+      const rect = springSpikesHazardRect(trap, this.elapsed)
       return rect ? [rect] : []
     }
     return trapTriggerRects(trap, this.elapsed)
@@ -1692,15 +1886,18 @@ export class GameSimulation {
       const cells = trapCellRects(trap, this.elapsed)
       const cell = cells[0]
       if (!cell) continue
-      const shouldActivate = Array.from(this.players.values()).some((player) => {
-        if (!player.alive || player.finished) return false
+      let shouldActivate = false
+      for (const player of this.players.values()) {
+        if (!player.alive || player.finished) continue
         const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+        const key = `${trap.instanceId}:${player.id}`
+        let inside = false
         if (trap.trapId === 'fortunecat') {
           const trigger = trapActivationRect(trap, this.elapsed)
-          return Boolean(trigger && overlaps(body.x, body.y, body.width, body.height, trigger.x, trigger.y, trigger.width, trigger.height))
+          inside = Boolean(trigger && overlaps(body.x, body.y, body.width, body.height, trigger.x, trigger.y, trigger.width, trigger.height))
         }
         if (trap.trapId === 'triggerhazard') {
-          return circleOverlapsRect(
+          inside = circleOverlapsRect(
             cell.x + CELL_SIZE / 2,
             cell.y + CELL_SIZE / 2,
             CELL_SIZE / 2,
@@ -1710,19 +1907,138 @@ export class GameSimulation {
             body.height,
           )
         }
-        // The APK triggers spring spikes from the matching collision face.
-        switch (trap.rotation) {
-          case 90:
-            return body.x <= cell.x + CELL_SIZE + 2 && body.x >= cell.x + CELL_SIZE - 8 && body.y + body.height > cell.y && body.y < cell.y + trap.height * CELL_SIZE
-          case 180:
-            return body.y <= cell.y + CELL_SIZE + 2 && body.y >= cell.y + CELL_SIZE - 8 && body.x + body.width > cell.x && body.x < cell.x + trap.width * CELL_SIZE
-          case 270:
-            return body.x + body.width >= cell.x - 2 && body.x + body.width <= cell.x + 8 && body.y + body.height > cell.y && body.y < cell.y + trap.height * CELL_SIZE
-          default:
-            return body.y + body.height >= cell.y - 2 && body.y + body.height <= cell.y + 8 && body.x + body.width > cell.x && body.x < cell.x + trap.width * CELL_SIZE
+        if (trap.trapId === 'triggerspikes') {
+          // The APK triggers spring spikes from the matching collision face.
+          const bounds = trapOccupiedBounds(trap, this.elapsed)
+          if (!bounds) continue
+          switch (trap.rotation) {
+            case 90:
+              inside = body.x <= bounds.x + bounds.width + 2 && body.x >= bounds.x + bounds.width - 8 && body.y + body.height > bounds.y && body.y < bounds.y + bounds.height
+              break
+            case 180:
+              inside = body.y <= bounds.y + bounds.height + 2 && body.y >= bounds.y + bounds.height - 8 && body.x + body.width > bounds.x && body.x < bounds.x + bounds.width
+              break
+            case 270:
+              inside = body.x + body.width >= bounds.x - 2 && body.x + body.width <= bounds.x + 8 && body.y + body.height > bounds.y && body.y < bounds.y + bounds.height
+              break
+            default:
+              inside = body.y + body.height >= bounds.y - 2 && body.y + body.height <= bounds.y + 8 && body.x + body.width > bounds.x && body.x < bounds.x + bounds.width
+              break
+          }
         }
-      })
+        if (inside) {
+          if (!this.trapTriggerOccupants.has(key)) shouldActivate = true
+          this.trapTriggerOccupants.add(key)
+        } else {
+          this.trapTriggerOccupants.delete(key)
+        }
+      }
       if (shouldActivate) this.trapActivationAt.set(trap.instanceId, this.elapsed)
+    }
+  }
+
+  private updateSurfaceStates() {
+    for (const player of this.players.values()) {
+      if (!player.alive || player.finished) continue
+      const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+      const nextIce = this.placedTraps.some((trap) =>
+        trap.trapId === 'ice' && trapTriggerRects(trap, this.elapsed).some((rect) =>
+          overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
+        ),
+      )
+      const nextMud = this.placedTraps.some((trap) =>
+        trap.trapId === 'mud' && trapTriggerRects(trap, this.elapsed).some((rect) =>
+          overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
+        ),
+      )
+      if (nextIce) this.iceOccupants.add(player.id)
+      else this.iceOccupants.delete(player.id)
+      if (nextMud) this.mudOccupants.add(player.id)
+      else this.mudOccupants.delete(player.id)
+      player.inIce = this.iceOccupants.has(player.id)
+      player.inMud = this.mudOccupants.has(player.id)
+    }
+  }
+
+  private hasGroundedSurfaceContact(player: SimPlayer, trapId: 'ice' | 'mud') {
+    return this.placedTraps.some((trap) => {
+      // pv/_v only report grounded material when the component faces up.
+      if (trap.trapId !== trapId || trap.rotation !== 0) return false
+      return trapTriggerRects(trap, this.elapsed).some((rect) =>
+        overlaps(
+          player.x + 4,
+          player.y + PLAYER_HEIGHT - 4,
+          PLAYER_WIDTH - 8,
+          8,
+          rect.x,
+          rect.y,
+          rect.width,
+          rect.height,
+        ),
+      )
+    })
+  }
+
+  private updateGasStates() {
+    const previousGasPlayers = new Set<string>()
+    for (const key of this.gasOccupants) {
+      const separator = key.indexOf(':')
+      if (separator >= 0) previousGasPlayers.add(key.slice(separator + 1))
+    }
+
+    for (const trap of this.placedTraps) {
+      if (trap.trapId !== 'gas') continue
+      const motion = trapMotion(trap, this.elapsed)
+      // zy creates child colliders from the component origin. The extracted
+      // APK uses local offsets (-1,-1) for the 2x2 outer box and
+      // (-0.75,-0.75) for the 1.5x1.5 inner box; these are not centered from
+      // the occupied cell rectangle.
+      const originX = trap.x * CELL_SIZE + motion.offsetX
+      const originY = trap.y * CELL_SIZE + motion.offsetY
+      const outer = {
+        x: originX - CELL_SIZE,
+        y: originY - CELL_SIZE,
+        width: CELL_SIZE * 2,
+        height: CELL_SIZE * 2,
+      }
+      const inset = CELL_SIZE * 0.75
+      const inner = {
+        x: originX - inset,
+        y: originY - inset,
+        width: CELL_SIZE * 1.5,
+        height: CELL_SIZE * 1.5,
+      }
+      for (const player of this.players.values()) {
+        if (!player.alive || player.finished) continue
+        const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+        const key = `${trap.instanceId}:${player.id}`
+        const insideInner = overlaps(body.x, body.y, body.width, body.height, inner.x, inner.y, inner.width, inner.height)
+        const insideOuter = overlaps(body.x, body.y, body.width, body.height, outer.x, outer.y, outer.width, outer.height)
+
+        // APK enterGas is an enter event. Staying inside the inner box must
+        // never refresh the effect on every fixed tick.
+        if (insideInner) this.gasOccupants.add(key)
+        // APK exitGas is attached to the 2x2 outer trigger. Once that trigger
+        // is left, this gas is removed from the player's active gas list.
+        else if (!insideOuter) this.gasOccupants.delete(key)
+      }
+    }
+
+    for (const player of this.players.values()) {
+      const active = Array.from(this.gasOccupants).some((key) => key.endsWith(`:${player.id}`))
+      const wasActive = previousGasPlayers.has(player.id)
+      if (active) {
+        player.reverseUntil = Number.POSITIVE_INFINITY
+        player.gasExitUntil = Number.POSITIVE_INFINITY
+      } else if (wasActive) {
+        // The source controller keeps the reverse indicator for two seconds
+        // after the final outer trigger exit, then stopReverse() clears it.
+        player.gasExitUntil = this.elapsed + 2
+        player.reverseUntil = player.gasExitUntil
+      } else if (player.gasExitUntil > 0 && player.gasExitUntil <= this.elapsed) {
+        player.reverseUntil = 0
+        player.gasExitUntil = 0
+      }
     }
   }
 
@@ -1812,6 +2128,7 @@ export class GameSimulation {
   }
 
   private resolvePlayerCollision() {
+    if (!this.playerCollisionEnabled) return
     const players = Array.from(this.players.values()).filter((player) => player.alive && !player.finished)
     if (players.length < 2) return
     for (let i = 0; i < players.length; i += 1) {
