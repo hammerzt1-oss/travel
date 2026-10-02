@@ -584,6 +584,24 @@ rightSpringSimulation.setInput('spring-right-player', { left: false, right: true
 rightSpringSimulation.tick(1 / 60)
 assert.ok(rightSpringPlayer.velocityX > 800)
 
+// A vertical spring may share its lower edge with the ground. The APK still
+// uses the side collision normal in that frame; a grounded result from the
+// floor must not mask the spring face contact.
+const groundedSideSpringSimulation = new GameSimulation(
+  1,
+  [{ id: 'grounded-side-spring-player', slot: 1, label: 'Player 1', score: 0 }],
+  [rightSpring],
+)
+const groundedSideSpringPlayer = groundedSideSpringSimulation.players.get('grounded-side-spring-player')
+assert.ok(groundedSideSpringPlayer)
+groundedSideSpringPlayer.x = 70
+groundedSideSpringPlayer.y = 540
+groundedSideSpringPlayer.onGround = true
+groundedSideSpringSimulation.setInput('grounded-side-spring-player', { left: false, right: true, jump: false })
+groundedSideSpringSimulation.tick(1 / 60)
+assert.ok(groundedSideSpringPlayer.velocityX > 800)
+assert.equal(groundedSideSpringPlayer.onGround, false)
+
 const leftSpring: PlacedTrap = {
   instanceId: 'spring-left-1',
   trapId: 'spring',

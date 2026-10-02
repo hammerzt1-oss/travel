@@ -1686,11 +1686,11 @@ export class GameSimulation {
         const horizontalOverlap = player.x + PLAYER_WIDTH > rect.x && player.x < rect.x + rect.width
         const faceTolerance = 3
         let contact: Rotation | null = null
-        if (movement.grounded && movement.surface &&
-          (movement.surface as Surface).trap?.instanceId === trap.instanceId &&
-          horizontalOverlap) {
-          contact = 0
-        } else if (movement.hitRight && trap.rotation === 90 && verticalOverlap &&
+        // Check the directional faces first. A player can be grounded on the
+        // lower edge of a vertical spring while simultaneously entering its
+        // active side; treating that frame as a top landing loses the spring
+        // impulse and leaves the player glued to the collider.
+        if (movement.hitRight && trap.rotation === 90 && verticalOverlap &&
           Math.abs(player.x + PLAYER_WIDTH - rect.x) <= faceTolerance) {
           contact = 90
         } else if (movement.hitLeft && trap.rotation === 270 && verticalOverlap &&
@@ -1699,6 +1699,10 @@ export class GameSimulation {
         } else if (movement.hitCeiling && trap.rotation === 180 && horizontalOverlap &&
           Math.abs(player.y - (rect.y + rect.height)) <= faceTolerance) {
           contact = 180
+        } else if (movement.grounded && movement.surface &&
+          (movement.surface as Surface).trap?.instanceId === trap.instanceId &&
+          horizontalOverlap) {
+          contact = 0
         }
 
         const key = `${trap.instanceId}:${player.id}`

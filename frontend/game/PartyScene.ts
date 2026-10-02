@@ -153,6 +153,16 @@ export class PartyScene extends Phaser.Scene {
     return PDZZ_COMPONENTS.find((component) => component.id === trapId) ?? null
   }
 
+  private isGroundAnchoredTrap(trapId: string, rotation: Rotation) {
+    return rotation === 0 && (
+      trapId === 'spike' ||
+      trapId === 'spike3x1' ||
+      trapId === 'ice' ||
+      trapId === 'mud' ||
+      trapId === 'triggerhazard'
+    )
+  }
+
   private componentTexture(component: ReturnType<PartyScene['componentFor']>) {
     if (!component?.iconFrame || !component.iconSource) return null
     const directKey = `pdzz-component-image-${component.id}`
@@ -716,14 +726,14 @@ export class PartyScene extends Phaser.Scene {
       }
     }
 
-    if (trapId === 'spike' || trapId === 'spike3x1' || trapId === 'ice' || trapId === 'mud') {
-      // These APK sprites are authored around the centre of their occupied
-      // cell(s). The gameplay trigger is a smaller strip inside that cell;
-      // it must not be used as the sprite anchor or the art floats away from
-      // the platform after a rotation.
+    if (this.isGroundAnchoredTrap(trapId, rotation)) {
+      // APK snapToGround components use the bottom of their occupied cells as
+      // the entity baseline. Their trigger strips and the platform top meet
+      // on this same line; centering the sprite leaves ice and mud visibly
+      // floating a few pixels above the floor.
       return {
         x: (x + width / 2) * cell,
-        y: (y + height / 2) * cell,
+        y: (y + height) * cell,
         angle: rotation,
       }
     }
@@ -860,14 +870,16 @@ export class PartyScene extends Phaser.Scene {
     if (trap.trapId === 'spike3x1') {
       // Jf creates three independent cv spike components. The component icon
       // is only an editor preview; gameplay uses three native spike frames.
+      const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
       for (let index = 0; index < 3; index += 1) {
-        this.addGameImage(container, 'spike.png', (index - 1) * cell, 0)
+        this.addGameImage(container, 'spike.png', (index - 1) * cell, 0, 1, 0.5, groundAnchored ? 1 : 0.5)
       }
       return
     }
 
     if (trap.trapId === 'spike') {
-      this.addGameImage(container, 'spike.png', 0, 0)
+      const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
+      this.addGameImage(container, 'spike.png', 0, 0, 1, 0.5, groundAnchored ? 1 : 0.5)
       return
     }
 
@@ -882,7 +894,8 @@ export class PartyScene extends Phaser.Scene {
     }
 
     if (trap.trapId === 'ice') {
-      this.addGameImage(container, 'ice.png', 0, 0)
+      const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
+      this.addGameImage(container, 'ice.png', 0, 0, 1, 0.5, groundAnchored ? 1 : 0.5)
       return
     }
 
@@ -913,19 +926,30 @@ export class PartyScene extends Phaser.Scene {
           ? Math.max(0, 1 - renderAge / 0.5)
           : cactusProgress(renderAge)
       if (progress <= 0) {
-        this.addGameImage(container, 'triggerhazardhide.png', 0, 53, 1, 0.5, 1)
+        const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
+        this.addGameImage(
+          container,
+          'triggerhazardhide.png',
+          0,
+          groundAnchored ? 0 : 53,
+          1,
+          0.5,
+          1,
+        )
       } else {
         const frame = phase === 'reverting' || Math.floor(renderAge / 0.2) % 2 === 1
           ? 'triggerhazard2.png'
           : 'triggerhazard.png'
-        const cactus = this.addGameImage(container, frame, 0, 25, 1, 0.5, 1)
+        const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
+        const cactus = this.addGameImage(container, frame, 0, groundAnchored ? 0 : 25, 1, 0.5, 1)
         cactus?.setScale(1, progress)
       }
       return
     }
 
     if (trap.trapId === 'mud') {
-      this.addGameImage(container, 'mud.png', 0, 0)
+      const groundAnchored = this.isGroundAnchoredTrap(trap.trapId, trap.rotation)
+      this.addGameImage(container, 'mud.png', 0, 0, 1, 0.5, groundAnchored ? 1 : 0.5)
       return
     }
 
@@ -1109,7 +1133,7 @@ export class PartyScene extends Phaser.Scene {
         this.previewSprite.setTexture(texture.key, texture.frame)
       }
       this.previewSprite
-        .setOrigin(0.5, 0.5)
+        .setOrigin(0.5, this.isGroundAnchoredTrap(trapId, rotation) ? 1 : 0.5)
         .setPosition(visualAnchor.x, visualAnchor.y)
         .setDisplaySize(
           (component.viewWidth ?? component.width) * state.level.cellSize,
@@ -1515,9 +1539,13 @@ export class PartyScene extends Phaser.Scene {
       .sort((a, b) => Math.abs(worldPoint.y - a.y) - Math.abs(worldPoint.y - b.y))[0]
 
     if (!surface) return { x: rawX, y: rawY }
+    const snappedY = Math.max(0, surface.y / state.level.cellSize - pending.height)
+    const legalOnSurface = pending.legalCells.filter((cell) => cell.y === snappedY)
+    const closestLegal = legalOnSurface
+      .sort((left, right) => Math.abs(left.x - rawX) - Math.abs(right.x - rawX))[0]
     return {
-      x: rawX,
-      y: Math.max(0, surface.y / state.level.cellSize - pending.height),
+      x: closestLegal?.x ?? rawX,
+      y: snappedY,
     }
   }
 }
