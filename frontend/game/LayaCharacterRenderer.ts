@@ -284,8 +284,15 @@ export class LayaCharacterRenderer {
     // the feet have landed, which used to swallow a perfectly valid jump.
     const wallClinging = !prediction.grounded && prediction.onWall && prediction.fallingTime > 0.085 && prediction.velocityY >= 0
     if (wallClinging) {
+      // Keep the APK's currentInputHoriSpeed component when replacing the
+      // extra air speed with the wall-jump impulse. Without this assignment,
+      // the next prediction frame derives a fake +900 input speed from the
+      // newly-added impulse and cancels the outward jump when a direction is
+      // held against the wall.
+      const inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.wallJumpStartVerticalVelocity
       prediction.extraHorizontalAirSpeed = prediction.wallDirection * PDZZ_PHYSICS.playerDerived.wallJumpStartHorizontalVelocity
+      prediction.velocityX = inputVelocityX + prediction.extraHorizontalAirSpeed
       prediction.onWall = false
       prediction.fallingTime = 0
       prediction.jumping = true
@@ -294,6 +301,7 @@ export class LayaCharacterRenderer {
       prediction.serverAirborne = false
       prediction.updatedAt = now
     } else if (prediction.grounded || player.animationState === 'idle' || player.animationState === 'run') {
+      const inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity
       prediction.jumping = true
       prediction.grounded = false
@@ -301,6 +309,8 @@ export class LayaCharacterRenderer {
       prediction.serverAirborne = false
       prediction.onWall = false
       prediction.fallingTime = 0
+      prediction.extraHorizontalAirSpeed = 0
+      prediction.velocityX = inputVelocityX
       prediction.updatedAt = now
     }
   }
@@ -540,6 +550,8 @@ export class LayaCharacterRenderer {
       0,
       PDZZ_PHYSICS.playerDerived.wallJumpAirHorizontalForce * dt,
     )
+    // Keep the input and wall-jump components separate until the final
+    // velocity assignment, matching CharacterController.applyHorizontalVelocity.
     prediction.velocityX = inputVelocityX + prediction.extraHorizontalAirSpeed
     deltaX = prediction.velocityX * dt
 
@@ -598,6 +610,17 @@ export class LayaCharacterRenderer {
         prediction.velocityY = 0
         hitCeiling = true
       }
+    }
+    // APK collisionState remains available while the collider is flush with a
+    // wall, even if the player releases horizontal input. Keep that contact
+    // alive so a wall jump can be triggered without holding into the wall.
+    for (const platform of platforms) {
+      const verticalOverlap =
+        nextY + LOCAL_PLAYER_HEIGHT > platform.y &&
+        nextY < platform.y + platform.height
+      if (!verticalOverlap) continue
+      if (Math.abs(nextX + LOCAL_PLAYER_WIDTH - platform.x) <= 1) hitRight = true
+      if (Math.abs(nextX - (platform.x + platform.width)) <= 1) hitLeft = true
     }
     prediction.x = nextX
     prediction.y = nextY

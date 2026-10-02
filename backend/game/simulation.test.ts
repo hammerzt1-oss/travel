@@ -104,6 +104,29 @@ assert.equal(wallJumpPlayer.jumpConsumed, true)
 assert.equal(wallJumpPlayer.velocityX, -838.8)
 assert.equal(wallJumpPlayer.velocityY, -704.2175739719539)
 
+// Holding the direction into the wall must not cancel the outward component.
+// APK keeps the 250px/s input velocity separate from the wall-jump impulse.
+const heldDirectionWallJumpSimulation = new GameSimulation(
+  1,
+  [{ id: 'held-wall-jump', slot: 1, label: 'Player 1', score: 0 }],
+  [],
+)
+const heldDirectionWallJumpPlayer = heldDirectionWallJumpSimulation.players.get('held-wall-jump')
+assert.ok(heldDirectionWallJumpPlayer)
+heldDirectionWallJumpPlayer.x = -30
+heldDirectionWallJumpPlayer.y = 560
+heldDirectionWallJumpPlayer.velocityY = 200
+heldDirectionWallJumpPlayer.onGround = false
+heldDirectionWallJumpPlayer.onWall = true
+heldDirectionWallJumpPlayer.wallDirection = -1
+heldDirectionWallJumpSimulation.setInput('held-wall-jump', { left: false, right: true, jump: false }, 1)
+for (let index = 0; index < 5; index += 1) heldDirectionWallJumpSimulation.tick(0.017)
+heldDirectionWallJumpSimulation.setInput('held-wall-jump', { left: false, right: true, jump: true }, 2, true)
+heldDirectionWallJumpSimulation.tick(0.017)
+assert.equal(heldDirectionWallJumpPlayer.x, -40.8516)
+assert.equal(heldDirectionWallJumpPlayer.velocityX, -634.8)
+assert.equal(heldDirectionWallJumpPlayer.velocityY, -704.2175739719539)
+
 const haystackSimulation = new GameSimulation(
   1,
   [{ id: 'haystack-player', slot: 1, label: '棒尼', score: 0 }],
