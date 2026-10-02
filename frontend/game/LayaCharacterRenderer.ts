@@ -87,6 +87,8 @@ const CHARACTER_MAX_HISTORY = 8
 const CHARACTER_ART_HEIGHT = 60
 const CHARACTER_RENDER_INTERVAL_MS = 1000 / 60
 const LOCAL_PREDICTION_MAX_DT_MS = 120
+const LOCAL_PLAYER_WIDTH = 30
+const LOCAL_PLAYER_HEIGHT = 60
 const animationForState: Record<PlayerSnapshot['animationState'], string> = {
   idle: 'idle',
   run: 'run',
@@ -467,8 +469,11 @@ export class LayaCharacterRenderer {
     } else {
       prediction.velocityX = 0
     }
-    prediction.x += prediction.velocityX * dt
-    if (prediction.jumping) {
+    const previousX = prediction.x
+    const previousY = prediction.y
+    let deltaX = prediction.velocityX * dt
+    let deltaY = 0
+    if (prediction.jumping || !prediction.grounded) {
       const gravity = this.localInput.jump
         ? PDZZ_PHYSICS.playerDerived.gravity
         : PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.jumpUpGravityVariation
@@ -476,7 +481,84 @@ export class LayaCharacterRenderer {
         PDZZ_PHYSICS.player.maxFallSpeed,
         prediction.velocityY + gravity * dt,
       )
-      prediction.y += prediction.velocityY * dt
+      deltaY = prediction.velocityY * dt
+    } else {
+      prediction.velocityY = 0
+    }
+
+    const platforms = (this.latestState?.level.platforms ?? []).filter((platform) => !platform.oneWay)
+    let nextX = previousX + deltaX
+    let nextY = previousY + deltaY
+    let landed = false
+    let hitCeiling = false
+    for (const platform of platforms) {
+      const sweptTop = Math.min(previousY, nextY)
+      const sweptBottom = Math.max(previousY, nextY) + LOCAL_PLAYER_HEIGHT
+      const verticalOverlap = sweptBottom > platform.y && sweptTop < platform.y + platform.height
+      if (!verticalOverlap) continue
+      if (
+        deltaX > 0 &&
+        previousX + LOCAL_PLAYER_WIDTH <= platform.x &&
+        nextX + LOCAL_PLAYER_WIDTH > platform.x &&
+        nextY < platform.y + platform.height &&
+        nextY + LOCAL_PLAYER_HEIGHT > platform.y
+      ) {
+        nextX = platform.x - LOCAL_PLAYER_WIDTH
+        deltaX = 0
+        prediction.velocityX = 0
+      } else if (
+        deltaX < 0 &&
+        previousX >= platform.x + platform.width &&
+        nextX < platform.x + platform.width &&
+        nextY < platform.y + platform.height &&
+        nextY + LOCAL_PLAYER_HEIGHT > platform.y
+      ) {
+        nextX = platform.x + platform.width
+        deltaX = 0
+        prediction.velocityX = 0
+      }
+    }
+    for (const platform of platforms) {
+      const overlapsHorizontally =
+        nextX + LOCAL_PLAYER_WIDTH > platform.x && nextX < platform.x + platform.width
+      if (!overlapsHorizontally) continue
+      if (
+        deltaY > 0 &&
+        previousY + LOCAL_PLAYER_HEIGHT <= platform.y + 1 &&
+        nextY + LOCAL_PLAYER_HEIGHT >= platform.y
+      ) {
+        nextY = platform.y - LOCAL_PLAYER_HEIGHT
+        prediction.velocityY = 0
+        landed = true
+      } else if (
+        deltaY < 0 &&
+        previousY >= platform.y + platform.height - 1 &&
+        nextY <= platform.y + platform.height
+      ) {
+        nextY = platform.y + platform.height
+        prediction.velocityY = 0
+        hitCeiling = true
+      }
+    }
+    prediction.x = nextX
+    prediction.y = nextY
+    if (landed) {
+      prediction.grounded = true
+      prediction.jumping = false
+      prediction.jumpStartedAt = null
+    } else if (hitCeiling) {
+      prediction.grounded = false
+      prediction.jumping = true
+    } else if (prediction.grounded) {
+      const supported = platforms.some((platform) =>
+        Math.abs(previousY + LOCAL_PLAYER_HEIGHT - platform.y) <= 1 &&
+        nextX + LOCAL_PLAYER_WIDTH > platform.x &&
+        nextX < platform.x + platform.width,
+      )
+      if (!supported) {
+        prediction.grounded = false
+        prediction.jumping = true
+      }
     }
     prediction.updatedAt = now
   }

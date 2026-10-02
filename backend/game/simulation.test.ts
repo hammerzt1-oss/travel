@@ -115,6 +115,43 @@ assert.ok(haystackPlayer)
 assert.equal(haystackPlayer.x, 328)
 assert.equal(haystackPlayer.y, 1240)
 
+// The lower haystack collider is a solid wall beneath the raised platform.
+// Walking right from the ground must stop at its left face instead of
+// crossing through the visual wall.
+const haystackWallSimulation = new GameSimulation(
+  1,
+  [{ id: 'haystack-wall', slot: 1, label: '棒尼', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const haystackWallPlayer = haystackWallSimulation.players.get('haystack-wall')
+assert.ok(haystackWallPlayer)
+haystackWallPlayer.x = 700
+haystackWallPlayer.y = 1240
+haystackWallPlayer.onGround = true
+haystackWallSimulation.setInput('haystack-wall', { left: false, right: true, jump: false }, 1)
+for (let index = 0; index < 30; index += 1) haystackWallSimulation.tick(0.017)
+assert.ok(haystackWallPlayer.x <= 720)
+assert.equal(haystackWallPlayer.onWall, true)
+
+// If a frame ever starts inside the ground collider, recovery must place the
+// collider on the grass top, never at the bottom of the map.
+const haystackPenetrationSimulation = new GameSimulation(
+  1,
+  [{ id: 'haystack-penetration', slot: 1, label: '棒尼', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const haystackPenetrationPlayer = haystackPenetrationSimulation.players.get('haystack-penetration')
+assert.ok(haystackPenetrationPlayer)
+haystackPenetrationPlayer.y = 1250
+haystackPenetrationPlayer.onGround = false
+haystackPenetrationPlayer.velocityY = 50
+haystackPenetrationSimulation.tick(0.017)
+assert.equal(haystackPenetrationPlayer.y, 1240)
+assert.equal(haystackPenetrationPlayer.onGround, true)
+assert.equal(haystackPenetrationPlayer.alive, true)
+
 // A jump tap is allowed in the first frame after the countdown. Spawn points
 // are authored on the start platform, so the initial snapshot must already be
 // grounded instead of reporting a transient fall state.

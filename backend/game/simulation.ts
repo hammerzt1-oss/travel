@@ -1428,11 +1428,13 @@ export class GameSimulation {
     if (!target) target = { x: this.level.finishX, y: this.level.finishY, jump: false }
     const dx = target.x - footX
     const jump = Boolean(target.jump && player.onGround && Math.abs(dx) < 115)
+    const wasJumping = player.input.jump
     player.input = {
       left: dx < -8,
       right: dx > 8,
       jump,
     }
+    if (jump && !wasJumping) player.jumpPressed = true
   }
 
   private resolvePlatformWalls(player: SimPlayer, previousX: number, previousY: number) {
@@ -1441,20 +1443,49 @@ export class GameSimulation {
       if (!overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, platform.x, platform.y, platform.width, platform.height)) {
         continue
       }
-      if (previousY + PLAYER_HEIGHT <= platform.y) continue
-      if (previousX + PLAYER_WIDTH <= platform.x) {
+      const cameFromAbove = previousY + PLAYER_HEIGHT <= platform.y + PHYSICS.characterController.skinWidth
+      const cameFromBelow = previousY >= platform.y + platform.height - PHYSICS.characterController.skinWidth
+      const cameFromLeft = previousX + PLAYER_WIDTH <= platform.x + PHYSICS.characterController.skinWidth
+      const cameFromRight = previousX >= platform.x + platform.width - PHYSICS.characterController.skinWidth
+
+      // A missed ray or a large frame can leave the body a few pixels inside
+      // a platform. Recover to the contacted face. The old code always used
+      // platform.y + platform.height here, which pushed a falling player to
+      // the bottom of the ground and looked like the animal sank underground.
+      if (cameFromAbove) {
+        player.y = platform.y - PLAYER_HEIGHT
+        player.velocityY = 0
+        player.onGround = true
+        player.fallingTime = 0
+        player.supportId = platform.id
+      } else if (cameFromBelow) {
+        player.y = platform.y + platform.height
+        if (player.velocityY < 0) player.velocityY = 0
+      } else if (cameFromLeft) {
         player.x = platform.x - PLAYER_WIDTH
         player.onWall = !player.onGround
         // wallDirection is the impulse direction away from the wall. Keep
         // this convention identical to moveCharacter's raycast result.
         player.wallDirection = 1
-      } else if (previousX >= platform.x + platform.width) {
+      } else if (cameFromRight) {
         player.x = platform.x + platform.width
         player.onWall = !player.onGround
         player.wallDirection = -1
-      } else if (player.y + PLAYER_HEIGHT > platform.y + 4) {
-        player.y = platform.y + platform.height
-        player.velocityY = Math.max(0, player.velocityY)
+      } else {
+        // The body started inside the collider. Resolve along the shallowest
+        // penetration instead of choosing the collider's bottom blindly.
+        const pushTop = Math.abs(player.y + PLAYER_HEIGHT - platform.y)
+        const pushBottom = Math.abs(platform.y + platform.height - player.y)
+        if (pushTop <= pushBottom) {
+          player.y = platform.y - PLAYER_HEIGHT
+          player.velocityY = 0
+          player.onGround = true
+          player.fallingTime = 0
+          player.supportId = platform.id
+        } else {
+          player.y = platform.y + platform.height
+          if (player.velocityY < 0) player.velocityY = 0
+        }
       }
       player.velocityX = 0
     }
