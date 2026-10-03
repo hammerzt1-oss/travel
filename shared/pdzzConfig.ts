@@ -29169,7 +29169,7 @@ export function getPdzzMap(mapId: string | null | undefined) { return PDZZ_MAPS.
 export function getPdzzCharacterForSlot(slot: number) { return PDZZ_CHARACTERS[(Math.max(1, slot) - 1) % PDZZ_CHARACTERS.length] ?? PDZZ_CHARACTERS[0] }
 
 /**
- * The eleven components used by the league build phase. The mechanics and
+ * The nine components used by the league build phase. The mechanics and
  * wording below are taken from the extracted APK creators, rather than from
  * the generic editor catalog descriptions.
  */
@@ -29178,11 +29178,9 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'gas',
   'triggerhazard',
   'spike3x1',
-  'mud',
   'triggerspikes',
   'spike',
   'spring',
-  'ice',
   'spikeball',
   'linearsaw',
 ] as const
@@ -29215,11 +29213,6 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
     configuration: '3×1 格；APK Jf 创建 3 个独立地刺子组件；默认贴平台，朝向旋转后每根碰撞条仍随方向旋转。',
   },
   {
-    id: 'mud',
-    functionText: '踩在泥巴上会减速，并使用泥地跳跃和贴墙下滑参数。',
-    configuration: '1×1 格；朝上时触发条为 40×15 px；水平速度 100，泥地跳跃高度 60，泥墙下滑重力倍率 2；离开触发条立即恢复。',
-  },
-  {
     id: 'triggerspikes',
     functionText: '从对应碰撞面触发弹簧刺，伸出期间接触即淘汰。',
     configuration: '4×1 格；只能从组件朝向的面触发；预警 0.55 秒，刺保持约 3 秒，0.05 秒收回；触发盒随朝向偏移到伸出侧。',
@@ -29233,11 +29226,6 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
     id: 'spring',
     functionText: '从弹簧朝向的碰撞面触发弹起或横向弹射。',
     configuration: '2×1 格；平台碰撞体按朝向为 100×50 或 50×100 px；上弹高度 1.5×普通跳跃，向右为 1.2×上弹速度，向左为 1×上弹速度，向下为 0.5×下落速度；动画压缩到 0.3 后回弹；仅匹配碰撞面触发。',
-  },
-  {
-    id: 'ice',
-    functionText: '踩到冰面后获得冰面惯性，水平速度提高并减小摩擦。',
-    configuration: '1×1 格；朝上触发条 50×15 px，旋转后为 15×50 px；冰面速度 350，释放方向键时使用 0.2 倍水平加速度减速。',
   },
   {
     id: 'spikeball',

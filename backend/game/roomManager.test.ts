@@ -109,6 +109,7 @@ assert.equal(placementState?.status, 'BUILDING')
 assert.equal(placementState?.buildState?.options.length, 6)
 assert.equal(new Set(placementState?.buildState?.options.map((option) => option.id)).size, 6)
 assert.ok(placementState?.buildState?.options.every((option) => PDZZ_LEAGUE_COMPONENT_IDS.includes(option.id as typeof PDZZ_LEAGUE_COMPONENT_IDS[number])))
+assert.ok(placementState?.buildState?.options.every((option) => option.id !== 'ice' && option.id !== 'mud'))
 const firstOption = placementState?.buildState?.options[0]
 assert.ok(firstOption)
 placementManager.handle('placement-host', { type: 'select_trap', trapId: firstOption.id })
