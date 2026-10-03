@@ -59,6 +59,7 @@ type SimPlayer = {
   deadAt: number | null
   timedOut: boolean
   killedByTrapOwnerId: string | null
+  deathTrapId: string | null
   slowUntil: number
   iceUntil: number
   boostUntil: number
@@ -1209,6 +1210,7 @@ export class GameSimulation {
             deadAt: null,
             timedOut: false,
             killedByTrapOwnerId: null,
+            deathTrapId: null,
             slowUntil: 0,
             iceUntil: 0,
             boostUntil: 0,
@@ -1661,7 +1663,7 @@ export class GameSimulation {
           overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, blade.x, blade.y, blade.width, blade.height) ||
           sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, blade)
         ) {
-          this.kill(player, trap.ownerId)
+          this.kill(player, trap.ownerId, false, trap.trapId)
           return
         }
         continue
@@ -1683,7 +1685,7 @@ export class GameSimulation {
           PLAYER_WIDTH,
           PLAYER_HEIGHT,
         ) || sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, spikeballBounds)) {
-          this.kill(player, trap.ownerId)
+          this.kill(player, trap.ownerId, false, trap.trapId)
           return
         }
         continue
@@ -1705,7 +1707,7 @@ export class GameSimulation {
           PLAYER_WIDTH,
           PLAYER_HEIGHT,
         ) || sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, sawBounds)) {
-          this.kill(player, trap.ownerId)
+          this.kill(player, trap.ownerId, false, trap.trapId)
           return
         }
         continue
@@ -2013,7 +2015,7 @@ export class GameSimulation {
 
     switch (effect) {
       case 'kill':
-        this.kill(player, trap.ownerId)
+        this.kill(player, trap.ownerId, false, trap.trapId)
         return
       case 'ice':
         // Maintained by updateSurfaceStates() until the trigger exit event.
@@ -2464,7 +2466,7 @@ export class GameSimulation {
           projectile.radius * 2,
           projectile.radius * 2,
         )) {
-          this.kill(player, projectile.ownerId)
+          this.kill(player, projectile.ownerId, false, projectile.trapId)
           hit = true
           break
         }
@@ -2474,11 +2476,17 @@ export class GameSimulation {
     this.projectiles = nextProjectiles
   }
 
-  private kill(player: SimPlayer, killerOwnerId: string | null = null, timedOut = false) {
+  private kill(
+    player: SimPlayer,
+    killerOwnerId: string | null = null,
+    timedOut = false,
+    deathTrapId: string | null = null,
+  ) {
     player.alive = false
     player.deadAt = this.elapsed
     player.timedOut = timedOut
     player.killedByTrapOwnerId = killerOwnerId && killerOwnerId !== player.id ? killerOwnerId : null
+    player.deathTrapId = deathTrapId
     player.velocityX = 0
     player.velocityY = 0
     player.input = { left: false, right: false, jump: false }
@@ -2531,6 +2539,7 @@ export class GameSimulation {
       score: player.score,
       characterId: player.characterId,
       characterAsset: player.characterAsset,
+      deathTrapId: player.deathTrapId,
       blinded: player.blindUntil > this.elapsed,
       lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,

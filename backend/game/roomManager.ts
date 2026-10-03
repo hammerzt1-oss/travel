@@ -151,11 +151,11 @@ export class RoomManager {
   handle(socketId: string, message: ClientMessage) {
     switch (message.type) {
       case 'create_room':
-        return this.createRoom(socketId)
+        return this.createRoom(socketId, message.name)
       case 'join_room':
-        return this.joinRoom(socketId, message.roomId)
+        return this.joinRoom(socketId, message.roomId, message.name)
       case 'random_join':
-        return this.randomJoin(socketId)
+        return this.randomJoin(socketId, message.name)
       case 'reconnect':
         return this.reconnect(socketId, message.roomId, message.token)
       case 'set_name':
@@ -267,12 +267,14 @@ export class RoomManager {
     this.emit({ type: 'room_state', roomId: context.room.roomId, state: this.roomState(context.room) })
   }
 
-  private createRoom(socketId: string): Session {
+  private createRoom(socketId: string, rawName?: string): Session | null {
     let roomId = createRoomId()
     while (this.rooms.has(roomId)) roomId = createRoomId()
     const playerId = randomUUID()
     const reconnectToken = createToken()
     const character = getPdzzCharacterForSlot(1)
+    const name = this.normalizeName(rawName, 'Player 1')
+    if (!name) return null
     const room: Room = {
       roomId,
       hostId: playerId,
@@ -285,7 +287,7 @@ export class RoomManager {
           {
             id: playerId,
             slot: 1,
-            label: 'Player 1',
+            label: name,
             connected: true,
             ready: true,
             score: 0,
@@ -298,8 +300,8 @@ export class RoomManager {
         ],
       ]),
       simulation: null,
-      selectedMapId: null,
-      mapMode: 'random',
+      selectedMapId: 'levelhaystack2',
+      mapMode: 'specific',
       activeMapId: null,
       placedTraps: [],
       build: null,
@@ -318,7 +320,7 @@ export class RoomManager {
     return session
   }
 
-  private joinRoom(socketId: string, rawRoomId: string): Session | null {
+  private joinRoom(socketId: string, rawRoomId: string, rawName?: string): Session | null {
     const roomId = normalizeRoomId(rawRoomId)
     const room = this.rooms.get(roomId)
     if (!room) return this.fail(socketId, 'ROOM_NOT_FOUND', '房间不存在')
@@ -329,10 +331,10 @@ export class RoomManager {
       return this.fail(socketId, 'GAME_STARTED', '本局游戏已经开始')
     }
 
-    return this.addPlayerToRoom(socketId, room)
+    return this.addPlayerToRoom(socketId, room, rawName)
   }
 
-  private randomJoin(socketId: string): Session | null {
+  private randomJoin(socketId: string, rawName?: string): Session | null {
     if (this.socketSessions.has(socketId)) {
       return this.fail(socketId, 'ALREADY_IN_ROOM', '你已经在房间里')
     }
@@ -347,20 +349,22 @@ export class RoomManager {
     }
 
     const room = availableRooms[Math.floor(Math.random() * availableRooms.length)]
-    return this.addPlayerToRoom(socketId, room)
+    return this.addPlayerToRoom(socketId, room, rawName)
   }
 
-  private addPlayerToRoom(socketId: string, room: Room): Session {
+  private addPlayerToRoom(socketId: string, room: Room, rawName?: string): Session | null {
     const playerId = randomUUID()
     const reconnectToken = createToken()
     const usedSlots = new Set(Array.from(room.players.values()).map((player) => player.slot))
     const slot = ([1, 2, 3, 4] as PlayerSlot[]).find((candidate) => !usedSlots.has(candidate)) ?? 4
     const character = getPdzzCharacterForSlot(slot)
+    const name = this.normalizeName(rawName, `Player ${slot}`)
+    if (!name) return null
     const session = { playerId, roomId: room.roomId, reconnectToken }
     room.players.set(playerId, {
       id: playerId,
       slot,
-      label: `Player ${slot}`,
+      label: name,
       connected: true,
       ready: false,
       score: 0,
@@ -424,15 +428,20 @@ export class RoomManager {
     if (room.status !== 'WAITING' && room.status !== 'READY') {
       return this.fail(socketId, 'INVALID_PHASE', '游戏开始后不能修改名字')
     }
-    const name = typeof rawName === 'string'
-      ? rawName.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim()
-      : ''
-    const length = Array.from(name).length
-    if (length < 1 || length > 16) {
+    const name = this.normalizeName(rawName)
+    if (!name) {
       return this.fail(socketId, 'INVALID_NAME', '名字需要为 1 到 16 个字符')
     }
     player.label = name
     this.broadcastRoom(room)
+  }
+
+  private normalizeName(rawName: unknown, fallback?: string) {
+    const name = typeof rawName === 'string'
+      ? rawName.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim()
+      : ''
+    if (!name) return fallback ?? null
+    return Array.from(name).length <= 16 ? name : null
   }
 
   private startGame(socketId: string) {
@@ -461,8 +470,10 @@ export class RoomManager {
     if (mapId !== null && !PDZZ_LEAGUE_MAP_IDS.includes(mapId)) {
       return this.fail(socketId, 'MAP_NOT_FOUND', '地图不存在或暂不可用')
     }
-    room.selectedMapId = mapId
-    room.mapMode = mapId ? 'specific' : 'random'
+    // Keep the protocol's nullable map field for old clients, but this release
+    // intentionally exposes and starts only the haystack stage.
+    room.selectedMapId = mapId === 'levelhaystack2' ? mapId : 'levelhaystack2'
+    room.mapMode = 'specific'
     room.activeMapId = null
     this.broadcastRoom(room)
   }
@@ -511,7 +522,7 @@ export class RoomManager {
     if (!room.activeMapId) {
       room.activeMapId = room.mapMode === 'specific' && room.selectedMapId
         ? room.selectedMapId
-        : PDZZ_LEAGUE_MAP_IDS[Math.floor(Math.random() * PDZZ_LEAGUE_MAP_IDS.length)]
+        : PDZZ_LEAGUE_MAP_IDS[0]
     }
     room.build = {
       endsAt: Date.now() + BUILD_DURATION_MS,

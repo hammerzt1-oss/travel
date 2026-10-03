@@ -29315,7 +29315,10 @@ export const PDZZ_CHARACTERS: PdzzCharacterDefinition[] = [
   }
 ]
 export const PDZZ_MAP_CATALOG = PDZZ_MAPS.filter((map) => map.id.startsWith('level') && map.id !== 'levelhome').map(({ elements, ...map }) => map)
-export const PDZZ_LEAGUE_MAP_CATALOG = PDZZ_MAP_CATALOG.filter((map) => map.available && map.supportAIBattle)
+// The current league release exposes the APK's haystack stage only. Keep this
+// restriction in shared config so the UI and every server-side map fallback
+// use the same single-map catalog.
+export const PDZZ_LEAGUE_MAP_CATALOG = PDZZ_MAP_CATALOG.filter((map) => map.id === 'levelhaystack2')
 export const PDZZ_LEAGUE_MAP_IDS = PDZZ_LEAGUE_MAP_CATALOG.map((map) => map.id)
 export const PDZZ_PLAYABLE_MAP_IDS = PDZZ_LEAGUE_MAP_IDS
 export function getPdzzMap(mapId: string | null | undefined) { return PDZZ_MAPS.find((map) => map.id === mapId) ?? PDZZ_MAPS.find((map) => map.id === 'levelfarm') ?? PDZZ_MAPS[0] }

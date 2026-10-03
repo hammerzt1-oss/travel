@@ -126,6 +126,8 @@ export type PlayerSnapshot = {
   score: number
   characterId: string
   characterAsset: string | null
+  /** The component that caused the player's death, when a trap killed them. */
+  deathTrapId?: string | null
   /** The local player is currently inside the two-second flash blind effect. */
   blinded?: boolean
   /** Highest client input sequence already consumed by the authoritative tick. */
@@ -272,9 +274,9 @@ export type RoundResult = {
 }
 
 export type ClientMessage =
-  | { type: 'create_room' }
-  | { type: 'join_room'; roomId: string }
-  | { type: 'random_join' }
+  | { type: 'create_room'; name?: string }
+  | { type: 'join_room'; roomId: string; name?: string }
+  | { type: 'random_join'; name?: string }
   | { type: 'reconnect'; roomId: string; token: string }
   | { type: 'set_name'; name: string }
   | { type: 'ready' }

@@ -421,9 +421,12 @@ export default function PartyGame() {
   const inputSequenceRef = useRef(0)
   const localInputListenerRef = useRef<LocalInputListener | null>(null)
   const [localInput, setLocalInput] = useState<PlayerInput>({ left: false, right: false, jump: false })
-  const [nameDraft, setNameDraft] = useState('')
-  const nameDraftPlayerRef = useRef<string | null>(null)
   const sessionStorageKey = 'party-platform-session'
+  const nicknameStorageKey = 'party-platform-nickname'
+  const [nameDraft, setNameDraft] = useState(() => (
+    typeof window === 'undefined' ? '' : window.localStorage.getItem(nicknameStorageKey) ?? ''
+  ))
+  const nameDraftPlayerRef = useRef<string | null>(null)
 
   const publishGameState = useCallback((next: GameState | null, immediate = false) => {
     pendingGameStateRef.current = next
@@ -688,7 +691,8 @@ export default function PartyGame() {
     setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
-    send({ type: 'create_room' })
+    const name = nameDraft.replace(/\s+/g, ' ').trim()
+    send({ type: 'create_room', name: name || undefined })
   }
 
   const joinRoom = () => {
@@ -704,14 +708,16 @@ export default function PartyGame() {
     setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
-    send({ type: 'join_room', roomId: normalized })
+    const name = nameDraft.replace(/\s+/g, ' ').trim()
+    send({ type: 'join_room', roomId: normalized, name: name || undefined })
   }
 
   const randomJoin = () => {
     setError('正在连接游戏服务器…')
     resetSocketForNewSession()
     connect()
-    send({ type: 'random_join' })
+    const name = nameDraft.replace(/\s+/g, ' ').trim()
+    send({ type: 'random_join', name: name || undefined })
   }
 
   const leaveRoom = () => {
@@ -744,6 +750,7 @@ export default function PartyGame() {
       return
     }
     setNameDraft(name)
+    window.localStorage.setItem(nicknameStorageKey, name)
     send({ type: 'set_name', name })
   }
 
@@ -799,6 +806,21 @@ export default function PartyGame() {
             <p className="eyebrow">LEAGUE SINGLE OR PARTY RUN</p>
             <h1>跳跳搭档</h1>
             <p className="home-tagline">选择机关、摆到地图里，五局比赛决定胜负。</p>
+            <div className="home-name-editor">
+              <label htmlFor="home-player-name">我的昵称</label>
+              <input
+                id="home-player-name"
+                value={nameDraft}
+                maxLength={16}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setNameDraft(value)
+                  window.localStorage.setItem(nicknameStorageKey, value)
+                }}
+                placeholder="输入昵称（1-16个字符）"
+                aria-label="我的昵称"
+              />
+            </div>
             <div className="home-actions">
               <button
                 className="primary-button"
@@ -890,21 +912,12 @@ export default function PartyGame() {
                     ? `本局：${PDZZ_LEAGUE_MAP_CATALOG.find((map) => map.id === room.activeMapId)?.name ?? room.activeMapId}`
                     : selectedMap
                       ? `已选择：${selectedMap.name}`
-                      : '房主可指定地图，也可以每局随机'}
+                      : '当前开放地图'}
                 </span>
               </div>
               <span className="map-mode-label">{room.mapMode === 'random' ? '随机' : '指定'}</span>
             </div>
             <div className="map-choice-grid">
-              <button
-                className={`map-choice random-map-choice ${room.mapMode === 'random' ? 'selected' : ''}`}
-                disabled={!isHost}
-                onClick={() => send({ type: 'select_map', mapId: null })}
-              >
-                <span className="random-map-mark">?</span>
-                <strong>随机地图</strong>
-                <small>从 APK 地图池抽取</small>
-              </button>
               {PDZZ_LEAGUE_MAP_CATALOG.map((map) => (
                 <button
                   className={`map-choice ${room.selectedMapId === map.id ? 'selected' : ''}`}
