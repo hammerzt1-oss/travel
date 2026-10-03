@@ -17,6 +17,7 @@ import {
   PDZZ_LEAGUE_COMPONENT_GUIDE,
   PDZZ_LEAGUE_MAP_CATALOG,
   PDZZ_MAP_CATALOG,
+  pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 import { PartyScene } from '../game/PartyScene'
 import { LayaCharacterRenderer } from '../game/LayaCharacterRenderer'
@@ -1024,7 +1025,7 @@ export default function PartyGame() {
                       <ComponentIcon option={option} />
                       <span>{option.name}</span>
                       <small>
-                        {option.width}×{option.height} 格 · {option.placement === 'supported' ? '必须贴平台' : '可自由安放'}
+                        {option.width}×{option.height} 格 · {pdzzTrapRequiresGroundSupport(option.id) ? '必须贴地' : '不能碰到地图地面'}
                       </small>
                       <small className="trap-option-description">{option.description}</small>
                       {claimedBy && <em>{claimedBy.id === localPlayerId ? '已拿' : 'P' + claimedBy.slot}</em>}
@@ -1056,7 +1057,7 @@ export default function PartyGame() {
               </section>
             <div className="build-note">
               <strong>格子规则</strong>
-                <span>绿色格都是当前机关的合法位置；所有机关必须整格对齐，不能和地面或已有机关重叠。只有标注“必须贴平台”的机关需要支撑。</span>
+                <span>绿色格都是当前机关的合法位置；所有机关必须整格对齐，不能和地面或已有机关重叠。只有普通地刺需要贴地，其余机关可悬空放置。</span>
               </div>
               {pendingPlacement && pendingPlacement.playerId === localPlayerId && (
                 <div className="placement-controls">
@@ -1076,9 +1077,9 @@ export default function PartyGame() {
                       {pendingPlacement.valid ? '绿色预览：可以放置' : '红色预览：不能放置'}
                     </span>
                     <span>
-                      {selectedTrapOption?.placement === 'supported'
+                      {selectedTrapOption && pdzzTrapRequiresGroundSupport(selectedTrapOption.id)
                         ? '直接指向地面或平台顶边，机关会自动吸附在表面上方'
-                        : '拖动地图中的预览，整格吸附'}
+                        : '拖动地图中的预览，避开地图地面，整格吸附'}
                     </span>
                   </div>
                   <div className="placement-actions">

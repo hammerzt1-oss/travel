@@ -9,6 +9,7 @@ import {
   PDZZ_CHARACTERS,
   PDZZ_COMPONENTS,
   PDZZ_MAP_CATALOG,
+  pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 
 const PLAYER_COLLIDER_WIDTH = 30
@@ -154,13 +155,7 @@ export class PartyScene extends Phaser.Scene {
   }
 
   private isGroundAnchoredTrap(trapId: string, rotation: Rotation) {
-    return rotation === 0 && (
-      trapId === 'spike' ||
-      trapId === 'spike3x1' ||
-      trapId === 'ice' ||
-      trapId === 'mud' ||
-      trapId === 'triggerhazard'
-    )
+    return rotation === 0 && pdzzTrapRequiresGroundSupport(trapId)
   }
 
   private componentTexture(component: ReturnType<PartyScene['componentFor']>) {
@@ -269,7 +264,7 @@ export class PartyScene extends Phaser.Scene {
   }
 
   private isSupported(trapId: string) {
-    return this.componentFor(trapId)?.placement === 'supported'
+    return pdzzTrapRequiresGroundSupport(trapId)
   }
 
   private componentCells(trapId: string, rotation: Rotation) {
@@ -727,10 +722,9 @@ export class PartyScene extends Phaser.Scene {
     }
 
     if (this.isGroundAnchoredTrap(trapId, rotation)) {
-      // APK snapToGround components use the bottom of their occupied cells as
-      // the entity baseline. Their trigger strips and the platform top meet
-      // on this same line; centering the sprite leaves ice and mud visibly
-      // floating a few pixels above the floor.
+      // Ordinary ground spikes use the bottom of their occupied cells as the
+      // entity baseline. Their trigger strip and the platform top meet on
+      // this same line.
       return {
         x: (x + width / 2) * cell,
         y: (y + height) * cell,

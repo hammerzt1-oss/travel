@@ -29185,6 +29185,11 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'linearsaw',
 ] as const
 
+/** Only the two ordinary ground-spike options require a platform underneath. */
+export function pdzzTrapRequiresGroundSupport(trapId: string) {
+  return trapId === 'spike' || trapId === 'spike3x1'
+}
+
 export type PdzzLeagueComponentGuide = {
   id: (typeof PDZZ_LEAGUE_COMPONENT_IDS)[number]
   functionText: string

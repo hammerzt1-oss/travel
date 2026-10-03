@@ -15,9 +15,11 @@ import type {
 } from '../../shared/gameProtocol'
 import {
   PDZZ_COMPONENTS,
+  PDZZ_LEAGUE_COMPONENT_IDS,
   PDZZ_PHYSICS,
   getPdzzCharacterForSlot,
   getPdzzMap,
+  pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 import { moveCharacter } from './pdzzCharacterController'
 
@@ -527,6 +529,11 @@ function isOneWayComponent(trapId: string) {
   return trapId === 'onewayplatform' || trapId === 'onewayplatformstatic' || trapId === 'onewayblock'
 }
 
+function trapRequiresGroundSupport(trapId: string, definition: TrapDefinition) {
+  const isLeagueTrap = (PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trapId)
+  return isLeagueTrap ? pdzzTrapRequiresGroundSupport(trapId) : definition.placement === 'supported'
+}
+
 const LINEAR_SAW_SPEED = PDZZ_PHYSICS.componentMechanics.linearSaw.speed
 const LINEAR_SAW_MAX_OFFSET = PDZZ_PHYSICS.componentMechanics.linearSaw.travelPixels
 const LINEAR_SAW_SPIN_DEGREES_PER_SECOND = PDZZ_PHYSICS.componentMechanics.linearSaw.spinDegreesPerSecond
@@ -658,6 +665,20 @@ function trapOccupiedBounds(trap: PlacedTrap, elapsed: number) {
 }
 
 type TrapRect = { x: number; y: number; width: number; height: number }
+
+/**
+ * The occupied-cell body is the physical obstacle of a placed league
+ * component. Ordinary ground spikes intentionally remain trigger-only: their
+ * exposed strip sits on the map platform instead of becoming a wall.
+ */
+function trapBodyRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
+  const definition = trapDefinition(trap.trapId)
+  const isLeagueTrap = (PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trap.trapId)
+  if (!isLeagueTrap || !definition || definition.collisionMode === 'none' || pdzzTrapRequiresGroundSupport(trap.trapId)) return []
+  return trap.trapId === 'spring'
+    ? springPlatformRects(trap, elapsed)
+    : trapCellRects(trap, elapsed)
+}
 
 function trapEntityCenter(trap: PlacedTrap, elapsed: number) {
   const motion = trapMotion(trap, elapsed)
@@ -931,7 +952,7 @@ export function isLegalTrapPlacement(
   ))
   if (overlapsPlatform) return false
 
-  if (definition.placement === 'supported') {
+  if (trapRequiresGroundSupport(trapId, definition)) {
     const bottomCells = trapBottomCells(definition, rotation)
     const hasSupport = bottomCells.every((cell) => {
       const cellX = worldX + cell.x * CELL_SIZE
@@ -1409,15 +1430,13 @@ export class GameSimulation {
       const definition = trapDefinition(trap.trapId)
       if (!definition) return []
       if (this.isTrapDisabled(trap)) return []
-      // Supported hazards, springs, ice and mud occupy the top edge of the
-      // cell they are placed on. Wall/platform components are solid bodies.
-      // This contact surface is what makes landing on a spike or spring
-      // trigger it, matching the APK's CharacterController contact callback.
-      const isSurface = definition.collisionMode === 'solid' || definition.collisionMode === 'hybrid'
+      // Every selected league component except ordinary ground spikes has an
+      // occupied-cell body. Trigger-only components used to be checked only
+      // after movement, which let the player walk through their artwork.
+      // Ground spikes remain pure exposed hazard strips on the map surface.
+      const isSurface = definition.collisionMode !== 'none' && !pdzzTrapRequiresGroundSupport(trap.trapId)
       if (!isSurface) return []
-      const rects = trap.trapId === 'spring'
-        ? springPlatformRects(trap, this.elapsed)
-        : trapCellRects(trap, this.elapsed)
+      const rects = trapBodyRects(trap, this.elapsed)
       return rects.map((rect, index) => ({
         id: `trap-surface-${trap.instanceId}-${index}`,
         x: rect.x,
@@ -1596,7 +1615,7 @@ export class GameSimulation {
         ) {
           this.applyTrapEffect(player, trap, definition.effect)
           if (!player.alive || player.finished) return
-        } else if (touchingTop && definition.placement === 'supported') {
+        } else if (touchingTop && trapRequiresGroundSupport(trap.trapId, definition)) {
           this.applyTrapEffect(player, trap, definition.effect)
           if (!player.alive || player.finished) return
         }
@@ -1749,7 +1768,7 @@ export class GameSimulation {
   ) {
     for (const trap of this.placedTraps) {
       const definition = trapDefinition(trap.trapId)
-      if (!definition || (definition.collisionMode !== 'solid' && definition.collisionMode !== 'hybrid') || isOneWayComponent(trap.trapId) || this.isTrapDisabled(trap)) continue
+      if (!definition || definition.collisionMode === 'none' || pdzzTrapRequiresGroundSupport(trap.trapId) || isOneWayComponent(trap.trapId) || this.isTrapDisabled(trap)) continue
       // The APK linearsaw base is a platform collider. The character
       // controller already resolves its top face; a penetration correction
       // here must not turn a top landing into a horizontal wall hit.
@@ -1757,7 +1776,7 @@ export class GameSimulation {
       // a second cell-sized wall pass after the spring impulse would erase
       // the side-launch position and velocity.
       if (trap.trapId === 'linearsaw' || trap.trapId === 'spring') continue
-      for (const rect of trapCellRects(trap, this.elapsed)) {
+      for (const rect of trapBodyRects(trap, this.elapsed)) {
         const trapX = rect.x
         const trapWidth = rect.width
         if (!overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, trapX, rect.y, trapWidth, rect.height)) continue
@@ -2001,17 +2020,17 @@ export class GameSimulation {
 
   private trapHazardRects(trap: PlacedTrap): TrapRect[] {
     if (trap.trapId === 'fortunecat') {
-      return [fortuneCatHazardRect(trap, this.elapsed)]
+      return [fortuneCatHazardRect(trap, this.elapsed), ...trapBodyRects(trap, this.elapsed)]
     }
     if (trap.trapId === 'triggerhazard') {
       const started = this.trapActivationAt.get(trap.instanceId)
       if (started === undefined) return []
       const rect = cactusHazardRect(trap, this.elapsed, this.elapsed - started)
-      return rect ? [rect] : []
+      return rect ? [rect, ...trapBodyRects(trap, this.elapsed)] : []
     }
     if (trap.trapId === 'triggerspikes') {
       const rect = springSpikesHazardRect(trap, this.elapsed)
-      return rect ? [rect] : []
+      return rect ? [rect, ...trapBodyRects(trap, this.elapsed)] : []
     }
     return trapTriggerRects(trap, this.elapsed)
   }
@@ -2079,6 +2098,13 @@ export class GameSimulation {
             cell.x + CELL_SIZE / 2,
             cell.y + CELL_SIZE / 2,
             CELL_SIZE / 2,
+          )
+          || sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            cell,
           )
         }
         if (trap.trapId === 'triggerspikes') {

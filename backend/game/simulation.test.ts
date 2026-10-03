@@ -6,6 +6,7 @@ import {
   TRAP_DEFINITIONS,
 } from './simulation'
 import type { PlacedTrap } from '../../shared/gameProtocol'
+import { PDZZ_LEAGUE_COMPONENT_IDS, pdzzTrapRequiresGroundSupport } from '../../shared/pdzzConfig'
 
 const supportedIce: PlacedTrap = {
   instanceId: 'ice-1',
@@ -524,6 +525,53 @@ gasSimulation.tick(1 / 60)
 assert.ok(gasPlayer.reverseUntil > gasSimulation.snapshot('PLAYING').phaseEndsAt! || gasPlayer.reverseUntil > 0)
 for (let index = 0; index < 125; index += 1) gasSimulation.tick(1 / 60)
 assert.equal(gasPlayer.reverseUntil, 0)
+
+// Trigger-only league components still occupy a physical body. The player
+// must stop at the gas cell instead of walking through its sprite.
+const gasWallSimulation = new GameSimulation(
+  1,
+  [{ id: 'gas-wall-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{ ...gas, instanceId: 'gas-wall', x: 4, y: 8 }],
+)
+const gasWallPlayer = gasWallSimulation.players.get('gas-wall-player')
+assert.ok(gasWallPlayer)
+gasWallPlayer.x = 150
+gasWallPlayer.y = 390
+gasWallPlayer.onGround = false
+gasWallSimulation.setInput('gas-wall-player', { left: false, right: true, jump: false })
+for (let index = 0; index < 60; index += 1) gasWallSimulation.tick(1 / 60)
+assert.ok(gasWallPlayer.x <= 170.1)
+
+// All non-ground-spike league options get the same occupied-cell body. They
+// may be placed away from map platforms, but a player cannot enter the body.
+for (const trapId of PDZZ_LEAGUE_COMPONENT_IDS) {
+  if (pdzzTrapRequiresGroundSupport(trapId)) continue
+  const definition = TRAP_DEFINITIONS.find((item) => item.id === trapId)
+  assert.ok(definition)
+  const bodySimulation = new GameSimulation(
+    1,
+    [{ id: `body-${trapId}`, slot: 1, label: 'Player 1', score: 0 }],
+    [{
+      instanceId: `body-${trapId}`,
+      trapId,
+      ownerId: 'p1',
+      x: 4,
+      y: 10,
+      width: definition.width,
+      height: definition.height,
+      rotation: 0,
+      placedRound: 1,
+    }],
+  )
+  const bodyPlayer = bodySimulation.players.get(`body-${trapId}`)
+  assert.ok(bodyPlayer)
+  bodyPlayer.x = 150
+  bodyPlayer.y = 540
+  bodyPlayer.onGround = true
+  bodySimulation.setInput(`body-${trapId}`, { left: false, right: true, jump: false })
+  for (let index = 0; index < 30 && bodyPlayer.alive; index += 1) bodySimulation.tick(1 / 60)
+  assert.ok(bodyPlayer.x <= 170.1, `${trapId} allowed the player inside its body`)
+}
 
 // Jf is three native spike colliders. Touching the third cell is enough to
 // die, even though the bundle itself is represented by one placed option.

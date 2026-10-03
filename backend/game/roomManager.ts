@@ -27,6 +27,7 @@ import {
   PDZZ_LEAGUE_COMPONENT_IDS,
   PDZZ_LEAGUE_MAP_IDS,
   getPdzzCharacterForSlot,
+  pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 
 type RoomPlayerState = RoomPlayer & {
@@ -132,6 +133,9 @@ function makeOptions() {
     const guide = PDZZ_LEAGUE_COMPONENT_GUIDE_BY_ID[id]
     return {
       ...definition,
+      // In the league build phase only ordinary ground spikes require a
+      // platform underneath; other selected components may float.
+      placement: pdzzTrapRequiresGroundSupport(id) ? ('supported' as const) : ('free' as const),
       description: `${guide.functionText} ${guide.configuration}`,
       claimedBy: null as string | null,
     }
