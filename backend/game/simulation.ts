@@ -667,14 +667,14 @@ function trapOccupiedBounds(trap: PlacedTrap, elapsed: number) {
 type TrapRect = { x: number; y: number; width: number; height: number }
 
 /**
- * The occupied-cell body is the physical obstacle of a placed league
- * component. Ordinary ground spikes intentionally remain trigger-only: their
- * exposed strip sits on the map platform instead of becoming a wall.
+ * The occupied-cell body is the physical obstacle of every placed league
+ * component. Damage/trigger rectangles are resolved separately below, so a
+ * trap can both block the character and still apply its effect.
  */
 function trapBodyRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
   const definition = trapDefinition(trap.trapId)
   const isLeagueTrap = (PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trap.trapId)
-  if (!isLeagueTrap || !definition || definition.collisionMode === 'none' || pdzzTrapRequiresGroundSupport(trap.trapId)) return []
+  if (!isLeagueTrap || !definition || definition.collisionMode === 'none') return []
   return trap.trapId === 'spring'
     ? springPlatformRects(trap, elapsed)
     : trapCellRects(trap, elapsed)
@@ -1430,11 +1430,9 @@ export class GameSimulation {
       const definition = trapDefinition(trap.trapId)
       if (!definition) return []
       if (this.isTrapDisabled(trap)) return []
-      // Every selected league component except ordinary ground spikes has an
-      // occupied-cell body. Trigger-only components used to be checked only
-      // after movement, which let the player walk through their artwork.
-      // Ground spikes remain pure exposed hazard strips on the map surface.
-      const isSurface = definition.collisionMode !== 'none' && !pdzzTrapRequiresGroundSupport(trap.trapId)
+      // Every selected league component contributes an occupied body. Its
+      // trigger/hazard effect is checked separately after movement.
+      const isSurface = definition.collisionMode !== 'none'
       if (!isSurface) return []
       const rects = trapBodyRects(trap, this.elapsed)
       return rects.map((rect, index) => ({
@@ -1768,7 +1766,7 @@ export class GameSimulation {
   ) {
     for (const trap of this.placedTraps) {
       const definition = trapDefinition(trap.trapId)
-      if (!definition || definition.collisionMode === 'none' || pdzzTrapRequiresGroundSupport(trap.trapId) || isOneWayComponent(trap.trapId) || this.isTrapDisabled(trap)) continue
+      if (!definition || definition.collisionMode === 'none' || isOneWayComponent(trap.trapId) || this.isTrapDisabled(trap)) continue
       // The APK linearsaw base is a platform collider. The character
       // controller already resolves its top face; a penetration correction
       // here must not turn a top landing into a horizontal wall hit.

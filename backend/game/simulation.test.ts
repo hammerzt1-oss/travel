@@ -6,7 +6,7 @@ import {
   TRAP_DEFINITIONS,
 } from './simulation'
 import type { PlacedTrap } from '../../shared/gameProtocol'
-import { PDZZ_LEAGUE_COMPONENT_IDS, pdzzTrapRequiresGroundSupport } from '../../shared/pdzzConfig'
+import { PDZZ_LEAGUE_COMPONENT_IDS } from '../../shared/pdzzConfig'
 
 const supportedIce: PlacedTrap = {
   instanceId: 'ice-1',
@@ -451,8 +451,8 @@ const selfDamageSimulation = new GameSimulation(
 selfDamageSimulation.tick(1 / 30)
 assert.equal(selfDamageSimulation.snapshot('PLAYING').players[0].alive, false)
 
-// A fast frame can enter and leave the 15px spike strip without the final
-// AABB overlapping it. The APK ray sweep still reports the contact.
+// The full occupied spike cell blocks a fast horizontal step before the
+// exposed 15px damage strip can be crossed.
 const sweptSpikeSimulation = new GameSimulation(
   1,
   [{ id: 'swept-spike-player', slot: 1, label: 'Player 1', score: 0 }],
@@ -465,7 +465,8 @@ sweptSpikePlayer.y = 540
 sweptSpikePlayer.velocityX = 250
 sweptSpikeSimulation.setInput('swept-spike-player', { left: false, right: true, jump: false }, 1)
 sweptSpikeSimulation.tick(1)
-assert.equal(sweptSpikePlayer.alive, false)
+assert.equal(sweptSpikePlayer.alive, true)
+assert.ok(sweptSpikePlayer.x <= 170.1)
 
 const cat: PlacedTrap = {
   instanceId: 'cat-1',
@@ -542,10 +543,10 @@ gasWallSimulation.setInput('gas-wall-player', { left: false, right: true, jump: 
 for (let index = 0; index < 60; index += 1) gasWallSimulation.tick(1 / 60)
 assert.ok(gasWallPlayer.x <= 170.1)
 
-// All non-ground-spike league options get the same occupied-cell body. They
-// may be placed away from map platforms, but a player cannot enter the body.
+// Every league option gets the same occupied-cell body. It must also hold for
+// the two ground-spike options: the exposed spike strip is a damage trigger,
+// while the occupied cell is still a solid obstacle for the character.
 for (const trapId of PDZZ_LEAGUE_COMPONENT_IDS) {
-  if (pdzzTrapRequiresGroundSupport(trapId)) continue
   const definition = TRAP_DEFINITIONS.find((item) => item.id === trapId)
   assert.ok(definition)
   const bodySimulation = new GameSimulation(
@@ -572,6 +573,33 @@ for (const trapId of PDZZ_LEAGUE_COMPONENT_IDS) {
   for (let index = 0; index < 30 && bodyPlayer.alive; index += 1) bodySimulation.tick(1 / 60)
   assert.ok(bodyPlayer.x <= 170.1, `${trapId} allowed the player inside its body`)
 }
+
+const groundSpikeCollisionSimulation = new GameSimulation(
+  1,
+  [{ id: 'ground-spike-wall-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'ground-spike-wall',
+    trapId: 'spike',
+    ownerId: 'p1',
+    x: 4,
+    y: 11,
+    width: 1,
+    height: 1,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const groundSpikeWallPlayer = groundSpikeCollisionSimulation.players.get('ground-spike-wall-player')
+assert.ok(groundSpikeWallPlayer)
+groundSpikeWallPlayer.x = 150
+groundSpikeWallPlayer.y = 540
+groundSpikeWallPlayer.onGround = true
+groundSpikeCollisionSimulation.setInput('ground-spike-wall-player', { left: false, right: true, jump: false })
+for (let index = 0; index < 60 && groundSpikeWallPlayer.alive; index += 1) {
+  groundSpikeCollisionSimulation.tick(1 / 60)
+}
+assert.ok(groundSpikeWallPlayer.alive)
+assert.ok(groundSpikeWallPlayer.x <= 170.1, 'ground spike allowed the player inside its blocking body')
 
 // Jf is three native spike colliders. Touching the third cell is enough to
 // die, even though the bundle itself is represented by one placed option.
