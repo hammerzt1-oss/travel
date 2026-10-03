@@ -835,7 +835,7 @@ export default function PartyGame() {
           />
         </div>
       )}
-      {deathNotice && (screen === 'game' || screen === 'result' || screen === 'final') && (
+      {deathNotice && (screen === 'build' || screen === 'game' || screen === 'result' || screen === 'final') && (
         <div className="pdzz-death-notice" role="status" aria-live="assertive">
           {deathNotice}
         </div>

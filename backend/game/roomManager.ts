@@ -498,7 +498,7 @@ export class RoomManager {
     this.broadcastRoom(room)
   }
 
-  private beginBuild(room: Room) {
+  private beginBuild(room: Room, preserveLastResult = false) {
     const players = Array.from(room.players.values()).sort((a, b) => a.slot - b.slot)
     const simulationPlayers = players.map((item) => ({
       id: item.id,
@@ -514,7 +514,7 @@ export class RoomManager {
     room.countdownValue = null
     room.phaseEndsAt = null
     room.roundResultEndsAt = null
-    room.lastResult = null
+    if (!preserveLastResult) room.lastResult = null
     if (!room.activeMapId) {
       room.activeMapId = room.mapMode === 'specific' && room.selectedMapId
         ? room.selectedMapId
@@ -785,6 +785,9 @@ export class RoomManager {
     }
     room.simulation?.setPlacedTraps(room.placedTraps)
     room.status = 'COUNTDOWN'
+    // Keep the previous round result visible during the build drawer, but do
+    // not let it leak into the next round's countdown or gameplay HUD.
+    room.lastResult = null
     room.countdownEndsAt = Date.now() + COUNTDOWN_DURATION_MS
     room.countdownValue = 3
     room.phaseEndsAt = null
@@ -825,7 +828,10 @@ export class RoomManager {
     // Intermediate rounds return directly to the build drawer. Scores are
     // already written above, and the next build keeps all placed traps.
     room.round += 1
-    this.beginBuild(room)
+    // The build drawer opens immediately between rounds. Preserve the result
+    // there so a death reason remains visible without showing a result modal.
+    room.lastResult = result
+    this.beginBuild(room, true)
   }
 
   private recomputePendingPlacements(room: Room) {

@@ -1008,6 +1008,9 @@ gravityFlipPlayer.onGround = false
 gravityFlipSimulation.tick(1 / 60)
 assert.ok(gravityFlipPlayer.gravityFlipUntil > 0)
 assert.ok(gravityFlipPlayer.velocityY < 0)
+const gravityFlipYAfterContact = gravityFlipPlayer.y
+gravityFlipSimulation.tick(1 / 60)
+assert.ok(gravityFlipPlayer.y < gravityFlipYAfterContact)
 
 const flashBlind: PlacedTrap = {
   instanceId: 'flash-blind-1',

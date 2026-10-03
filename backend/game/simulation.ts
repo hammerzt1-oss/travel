@@ -1281,6 +1281,12 @@ export class GameSimulation {
     for (const player of this.players.values()) {
       if (player.bot) this.updateBotInput(player)
       previousPositions.set(player.id, { x: player.x, y: player.y })
+    }
+    // Trigger enter effects from the state at the start of the fixed step as
+    // well as after movement. This makes gravity-flip and flash-blind react on
+    // the contact frame instead of one 60 Hz step later.
+    this.updateTrapStates(previousPositions)
+    for (const player of this.players.values()) {
       player.lastProcessedInputSequence = player.pendingInputSequence
       this.tickPlayer(player, dt)
     }
@@ -1788,9 +1794,9 @@ export class GameSimulation {
       const finishWidth = this.level.finishWidth ?? CELL_SIZE * 1.5
       const finishHeight = this.level.finishHeight ?? CELL_SIZE * 2
       const finishTrigger = {
-        // finishX/finishY are the flag frame's bottom-left anchor on the
-        // haystack map, matching the Phaser origin (0.05, 1).
-        x: this.level.finishX,
+        // finishX/finishY are the flag frame's Phaser anchor (0.05, 1), so
+        // move the authoritative frame rectangle by the same origin offset.
+        x: this.level.finishX - finishWidth * 0.05,
         y: this.level.finishY - finishHeight,
         width: finishWidth,
         height: finishHeight,
