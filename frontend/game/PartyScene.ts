@@ -108,7 +108,6 @@ export class PartyScene extends Phaser.Scene {
   private playerTargets = new Map<string, PlayerRenderTarget>()
   private lastRenderedBuildSignature = ''
   private lastRenderedUiSignature = ''
-  private nameplates = new Map<string, Phaser.GameObjects.Text>()
   private worldBackground?: Phaser.GameObjects.Rectangle
   private worldDecorations: Phaser.GameObjects.GameObject[] = []
   private worldPlatforms: Phaser.GameObjects.GameObject[] = []
@@ -439,8 +438,6 @@ export class PartyScene extends Phaser.Scene {
     this.currentCountdown = countdown
     if (!state || state.status !== 'PLAYING') this.localRenderPosition = null
     if (!state) {
-      for (const plate of this.nameplates.values()) plate.destroy()
-      this.nameplates.clear()
       return
     }
     this.renderState()
@@ -1197,8 +1194,6 @@ export class PartyScene extends Phaser.Scene {
         sprite.destroy()
         this.players.delete(id)
         this.playerTargets.delete(id)
-        this.nameplates.get(id)?.destroy()
-        this.nameplates.delete(id)
       }
     }
 
@@ -1237,7 +1232,6 @@ export class PartyScene extends Phaser.Scene {
         characterId: player.characterId,
         snap: !previousTarget || moved > 260 || !player.alive || player.finished,
       })
-      this.updateDeathMessage(player, targetX, targetY)
       if (!sprite) continue
       sprite
         .setFlipX(player.direction < 0)
@@ -1248,34 +1242,6 @@ export class PartyScene extends Phaser.Scene {
         sprite.setPosition(visual.x, visual.y)
       }
     }
-  }
-
-  private updateDeathMessage(player: PlayerSnapshot, targetX: number, targetY: number) {
-    const shouldShow = !player.alive && Boolean(player.deathTrapId) && this.currentState?.status !== 'BUILDING'
-    const existing = this.nameplates.get(player.id)
-    if (!shouldShow || !player.deathTrapId) {
-      existing?.destroy()
-      this.nameplates.delete(player.id)
-      return
-    }
-
-    const character = PDZZ_CHARACTERS.find((item) => item.refID === player.characterId)
-    const component = PDZZ_COMPONENTS.find((item) => item.id === player.deathTrapId)
-    const text = `宠物${character?.name ?? player.label}死于${component?.name ?? player.deathTrapId}`
-    const plate = existing ?? this.add.text(targetX, targetY - PLAYER_COLLIDER_HEIGHT / 2 - 12, text, {
-      color: '#fff8df',
-      backgroundColor: '#8f302b',
-      fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
-      fontSize: '16px',
-      fontStyle: 'bold',
-      padding: { left: 8, right: 8, top: 5, bottom: 5 },
-      stroke: '#351c1c',
-      strokeThickness: 4,
-    })
-      .setOrigin(0.5, 1)
-      .setDepth(30)
-    plate.setText(text).setPosition(targetX, targetY - PLAYER_COLLIDER_HEIGHT / 2 - 12).setVisible(true)
-    this.nameplates.set(player.id, plate)
   }
 
   private playerVisualPosition(
@@ -1300,10 +1266,6 @@ export class PartyScene extends Phaser.Scene {
     const smoothing = 1 - Math.exp(-Math.max(0, delta) / 65)
     for (const [id, target] of this.playerTargets) {
       const sprite = this.players.get(id)
-      const plate = this.nameplates.get(id)
-      if (plate) {
-        plate.setPosition(target.x, target.y - PLAYER_COLLIDER_HEIGHT / 2 - 12)
-      }
       if (!sprite) continue
       const visual = this.playerVisualPosition(target.x, target.y, target.direction, target.characterId)
       if (target.snap) {

@@ -1,5 +1,6 @@
 import type {
   AnimationState,
+  DeathReason,
   GameState,
   LevelHazard,
   LevelSnapshot,
@@ -60,6 +61,7 @@ type SimPlayer = {
   timedOut: boolean
   killedByTrapOwnerId: string | null
   deathTrapId: string | null
+  deathReason: DeathReason | null
   slowUntil: number
   iceUntil: number
   boostUntil: number
@@ -415,12 +417,13 @@ function buildMapLevel(mapId: string): LevelSnapshot {
     spawnY: spawn.y - PLAYER_HEIGHT,
     finishX: finish.x,
     finishY: finish.y,
-    // GoalArea.createFlag() in the APK uses BoxCollider(1.5 cells, 2 cells)
-    // with a local offset of (0, -2 cells), and the player collider is a
-    // 30x60 box anchored at the foot center.
+    // The extracted haystack flag is a 53x106 atlas frame. Its authored
+    // runtime position is the bottom-left visual anchor used by PartyScene,
+    // so the authoritative hitbox must use that same footprint rather than a
+    // larger editor cell area that can award a win beside the flag.
     finishRadius: 0,
-    finishWidth: CELL_SIZE * 1.5,
-    finishHeight: CELL_SIZE * 2,
+    finishWidth: 53,
+    finishHeight: 106,
   }
 }
 
@@ -1211,6 +1214,7 @@ export class GameSimulation {
             timedOut: false,
             killedByTrapOwnerId: null,
             deathTrapId: null,
+            deathReason: null,
             slowUntil: 0,
             iceUntil: 0,
             boostUntil: 0,
@@ -1247,7 +1251,7 @@ export class GameSimulation {
 
   markDead(playerId: string) {
     const player = this.players.get(playerId)
-    if (player && player.alive && !player.finished) this.kill(player)
+    if (player && player.alive && !player.finished) this.kill(player, null, false, null, 'disconnected')
   }
 
   setInput(playerId: string, input: PlayerInput, sequence?: number, jumpPressed = false) {
@@ -1311,6 +1315,7 @@ export class GameSimulation {
         if (!player.bot || !player.alive || player.finished) continue
         player.alive = false
         player.timedOut = true
+        player.deathReason = 'timeout'
         player.deadAt = this.elapsed
         player.velocityX = 0
         player.velocityY = 0
@@ -1356,6 +1361,8 @@ export class GameSimulation {
         roundScore,
         totalScore: player.score + roundScore,
         killedByTrapOwnerId: player.killedByTrapOwnerId,
+        deathTrapId: player.deathTrapId,
+        deathReason: player.deathReason,
       }
     })
 
@@ -1639,7 +1646,7 @@ export class GameSimulation {
 
     for (const hazard of this.level.hazards) {
       if (overlaps(player.x + 4, player.y + 5, PLAYER_WIDTH - 8, PLAYER_HEIGHT - 5, hazard.x, hazard.y, hazard.width, hazard.height)) {
-        this.kill(player)
+        this.kill(player, null, false, null, 'map_hazard')
         return
       }
     }
@@ -1770,7 +1777,7 @@ export class GameSimulation {
       footX < viewBounds.minX - 50 ||
       footX > viewBounds.minX + viewBounds.width + 50
     ) {
-      this.kill(player)
+      this.kill(player, null, false, null, 'out_of_bounds')
       return
     }
 
@@ -1781,7 +1788,9 @@ export class GameSimulation {
       const finishWidth = this.level.finishWidth ?? CELL_SIZE * 1.5
       const finishHeight = this.level.finishHeight ?? CELL_SIZE * 2
       const finishTrigger = {
-        x: this.level.finishX - finishWidth / 2,
+        // finishX/finishY are the flag frame's bottom-left anchor on the
+        // haystack map, matching the Phaser origin (0.05, 1).
+        x: this.level.finishX,
         y: this.level.finishY - finishHeight,
         width: finishWidth,
         height: finishHeight,
@@ -2481,12 +2490,14 @@ export class GameSimulation {
     killerOwnerId: string | null = null,
     timedOut = false,
     deathTrapId: string | null = null,
+    deathReason: DeathReason | null = null,
   ) {
     player.alive = false
     player.deadAt = this.elapsed
     player.timedOut = timedOut
     player.killedByTrapOwnerId = killerOwnerId && killerOwnerId !== player.id ? killerOwnerId : null
     player.deathTrapId = deathTrapId
+    player.deathReason = deathReason ?? (timedOut ? 'timeout' : deathTrapId ? 'trap' : 'out_of_bounds')
     player.velocityX = 0
     player.velocityY = 0
     player.input = { left: false, right: false, jump: false }
@@ -2540,6 +2551,7 @@ export class GameSimulation {
       characterId: player.characterId,
       characterAsset: player.characterAsset,
       deathTrapId: player.deathTrapId,
+      deathReason: player.deathReason,
       blinded: player.blindUntil > this.elapsed,
       lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,

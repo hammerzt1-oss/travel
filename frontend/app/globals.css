@@ -780,6 +780,24 @@ input:focus { border-color: var(--coral); }
   user-select: none;
   -webkit-user-drag: none;
 }
+.pdzz-death-notice {
+  position: fixed;
+  z-index: 8;
+  top: clamp(190px, 27vh, 430px);
+  left: 50%;
+  width: min(92vw, 720px);
+  padding: 10px 18px 12px;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(25, 184, 211, .92);
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-size: clamp(17px, 2.4vw, 30px);
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(18, 106, 132, .55);
+  pointer-events: none;
+}
 .pdzz-persistent-game-canvas .pdzz-laya-character-canvas {
   /* Laya applies its own mobile stage transform. The canvas is already
      fitted by the shared 750x1670 CSS surface, so that transform would scale

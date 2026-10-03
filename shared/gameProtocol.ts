@@ -128,6 +128,8 @@ export type PlayerSnapshot = {
   characterAsset: string | null
   /** The component that caused the player's death, when a trap killed them. */
   deathTrapId?: string | null
+  /** Authoritative reason for a non-finished terminal state. */
+  deathReason?: DeathReason | null
   /** The local player is currently inside the two-second flash blind effect. */
   blinded?: boolean
   /** Highest client input sequence already consumed by the authoritative tick. */
@@ -236,6 +238,8 @@ export type RoomPlayer = {
   bot?: boolean
 }
 
+export type DeathReason = 'trap' | 'map_hazard' | 'out_of_bounds' | 'timeout' | 'disconnected'
+
 export type RoomState = {
   roomId: string
   hostId: string
@@ -263,6 +267,8 @@ export type RoundResultEntry = {
   roundScore: number
   totalScore: number
   killedByTrapOwnerId: string | null
+  deathTrapId?: string | null
+  deathReason?: DeathReason | null
 }
 
 export type RoundResult = {

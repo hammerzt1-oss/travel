@@ -509,18 +509,6 @@ export class RoomManager {
       characterAsset: item.characterAsset,
       bot: false,
     }))
-    if (players.length === 1) {
-      const bot = getPdzzCharacterForSlot(2)
-      simulationPlayers.push({
-        id: `league-bot-${room.roomId}`,
-        slot: 2,
-        label: `联赛对手 · ${bot.name}`,
-        score: 0,
-        characterId: bot.refID,
-        characterAsset: bot.imageAsset,
-        bot: true,
-      })
-    }
     room.status = 'BUILDING'
     room.countdownEndsAt = null
     room.countdownValue = null

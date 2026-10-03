@@ -88,6 +88,19 @@ assert.equal(invalidRoom, null)
 
 console.log('room manager tests passed')
 
+const soloEvents: RoomEvent[] = []
+const soloManager = new RoomManager((event) => soloEvents.push(event))
+const soloSession = soloManager.handle('solo-host', { type: 'create_room', name: '单人玩家' })
+assert.ok(soloSession)
+soloManager.handle('solo-host', { type: 'start_game' })
+const soloBuild = [...soloEvents].reverse().find(
+  (event): event is Extract<RoomEvent, { type: 'room_state' }> => event.type === 'room_state' && event.roomId === soloSession.roomId,
+)
+assert.equal(soloBuild?.state.status, 'BUILDING')
+assert.equal(soloBuild?.state.players.length, 1)
+assert.equal(soloBuild?.state.players[0]?.bot, undefined)
+assert.equal(soloBuild?.state.gameState?.players.length, 1)
+
 const placementEvents: RoomEvent[] = []
 const placementManager = new RoomManager((event) => placementEvents.push(event))
 const placementHost = placementManager.handle('placement-host', { type: 'create_room' })

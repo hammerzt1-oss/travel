@@ -8,8 +8,11 @@ import type {
   ClientMessage,
   GameState,
   PlayerInput,
+  DeathReason,
+  PlayerSnapshot,
   RoomState,
   RoundResult,
+  RoundResultEntry,
   ServerMessage,
 } from '../../shared/gameProtocol'
 import {
@@ -71,6 +74,26 @@ function ComponentIcon({
       />
     </span>
   )
+}
+
+function formatDeathMessage(
+  player: Pick<PlayerSnapshot, 'label' | 'deathTrapId' | 'deathReason'> | Pick<RoundResultEntry, 'label' | 'deathTrapId' | 'deathReason'>,
+) {
+  const reason = player.deathReason
+  if (reason === 'trap' || player.deathTrapId) {
+    const component = player.deathTrapId
+      ? PDZZ_COMPONENTS.find((item) => item.id === player.deathTrapId)
+      : null
+    return `${player.label}-止步于${component?.name ?? '机关'}出局!`
+  }
+  const messages: Record<DeathReason, string> = {
+    map_hazard: '触碰地图危险区域出局!',
+    out_of_bounds: '掉出地图出局!',
+    timeout: '时间到，未到终点!',
+    disconnected: '离开游戏!',
+    trap: '止步于机关出局!',
+  }
+  return `${player.label}-${messages[reason ?? 'out_of_bounds']}`
 }
 
 function TouchControls({
@@ -779,6 +802,19 @@ export default function PartyGame() {
   const selectedMap = room?.selectedMapId
     ? PDZZ_LEAGUE_MAP_CATALOG.find((map) => map.id === room.selectedMapId) ?? null
     : null
+  const deathNotice = useMemo(() => {
+    const activeDeaths = gameState?.status === 'PLAYING'
+      ? gameState.players.filter((player) => !player.alive && !player.finished)
+      : []
+    const localDeath = activeDeaths.find((player) => player.id === localPlayerId)
+    const activeDeath = localDeath ?? activeDeaths[0]
+    if (activeDeath) return formatDeathMessage(activeDeath)
+
+    const resultDeaths = result?.entries.filter((entry) => entry.outcome !== 'finished') ?? []
+    const localResultDeath = resultDeaths.find((entry) => entry.playerId === localPlayerId)
+    const resultDeath = localResultDeath ?? resultDeaths[0]
+    return resultDeath ? formatDeathMessage(resultDeath) : null
+  }, [gameState, localPlayerId, result])
 
   return (
     <main className="party-shell">
@@ -797,6 +833,11 @@ export default function PartyGame() {
             localInputListenerRef={localInputListenerRef}
             onPlace={(x, y) => send({ type: 'place_trap', x, y, rotation: pendingPlacement?.rotation ?? 0 })}
           />
+        </div>
+      )}
+      {deathNotice && (screen === 'game' || screen === 'result' || screen === 'final') && (
+        <div className="pdzz-death-notice" role="status" aria-live="assertive">
+          {deathNotice}
         </div>
       )}
       {screen === 'home' && (
@@ -1164,7 +1205,7 @@ export default function PartyGame() {
                 <span className="result-icon">{entry.outcome === 'finished' ? '🏁' : '💫'}</span>
                 <div>
                   <strong>{entry.label}</strong>
-                  <span>{entry.outcome === 'finished' ? `到达终点 · ${entry.finishTime ?? 0}s` : entry.outcome === 'timeout' ? '时间到，未到终点' : '掉入机关'}</span>
+                  <span>{entry.outcome === 'finished' ? `到达终点 · ${entry.finishTime ?? 0}s` : formatDeathMessage(entry)}</span>
                   <small>基础 {entry.baseScore} · 机关奖励 {entry.trapBonus}</small>
                 </div>
                 <b>+{entry.roundScore}<small>总分 {entry.totalScore}</small></b>

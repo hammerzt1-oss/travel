@@ -54,8 +54,8 @@ assert.deepEqual(
     spawnY: 1240,
     finishX: 1821,
     finishY: 1300,
-    finishWidth: 75,
-    finishHeight: 100,
+    finishWidth: 53,
+    finishHeight: 106,
   },
 )
 assert.deepEqual(
@@ -407,9 +407,14 @@ assert.equal(jumpEdgePlayer.velocityY, 0)
 
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)
-// The goal is an AABB trigger around the authored flag point. Merely being
-// near the finish platform must not complete the round.
+// The goal uses the actual 53x106 flag frame footprint. Merely being near the
+// finish platform, or standing to the left of the flag, must not complete the
+// round.
 haystackPlayer.x = 1740
+haystackPlayer.y = 1200
+haystackSimulation.tick(0.017)
+assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, false)
+haystackPlayer.x = 1780
 haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, false)
