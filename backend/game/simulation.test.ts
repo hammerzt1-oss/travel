@@ -367,6 +367,44 @@ haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, true)
 
+// Finishing is also continuous: crossing the flag trigger in one movement
+// step must count even when the final body is already beyond its far edge.
+const sweptFinishSimulation = new GameSimulation(
+  1,
+  [{ id: 'swept-finish-player', slot: 1, label: 'Player 1', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const sweptFinishPlayer = sweptFinishSimulation.players.get('swept-finish-player')
+assert.ok(sweptFinishPlayer)
+sweptFinishPlayer.x = 1700
+sweptFinishPlayer.y = 1240
+sweptFinishPlayer.velocityX = 250
+sweptFinishSimulation.setInput('swept-finish-player', { left: false, right: true, jump: false }, 1)
+sweptFinishSimulation.tick(1)
+assert.equal(sweptFinishPlayer.finished, true)
+
+// League single-player runs include an AI opponent for presentation, but the
+// human result must not wait for that opponent to reach the flag.
+const singlePlayerLeagueSimulation = new GameSimulation(
+  1,
+  [
+    { id: 'league-human', slot: 1, label: 'Player 1', score: 0 },
+    { id: 'league-bot', slot: 2, label: '联赛对手', score: 0, bot: true },
+  ],
+  [],
+  'levelhaystack2',
+)
+const leagueHuman = singlePlayerLeagueSimulation.players.get('league-human')
+assert.ok(leagueHuman)
+leagueHuman.x = 1800
+leagueHuman.y = 1240
+singlePlayerLeagueSimulation.tick(0.017)
+assert.equal(singlePlayerLeagueSimulation.isComplete(), true)
+const leagueResult = singlePlayerLeagueSimulation.result()
+assert.equal(leagueResult.entries.find((entry) => entry.playerId === 'league-human')?.outcome, 'finished')
+assert.equal(leagueResult.entries.find((entry) => entry.playerId === 'league-bot')?.outcome, 'timeout')
+
 // Every round creates a fresh simulation, so a player starts at the same
 // authored spawn point instead of carrying the previous round's finish pose.
 const secondRoundSimulation = new GameSimulation(
@@ -411,6 +449,22 @@ const selfDamageSimulation = new GameSimulation(
 )
 selfDamageSimulation.tick(1 / 30)
 assert.equal(selfDamageSimulation.snapshot('PLAYING').players[0].alive, false)
+
+// A fast frame can enter and leave the 15px spike strip without the final
+// AABB overlapping it. The APK ray sweep still reports the contact.
+const sweptSpikeSimulation = new GameSimulation(
+  1,
+  [{ id: 'swept-spike-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{ ...selfSpike, instanceId: 'swept-spike', x: 2, y: 11 }],
+)
+const sweptSpikePlayer = sweptSpikeSimulation.players.get('swept-spike-player')
+assert.ok(sweptSpikePlayer)
+sweptSpikePlayer.x = 20
+sweptSpikePlayer.y = 540
+sweptSpikePlayer.velocityX = 250
+sweptSpikeSimulation.setInput('swept-spike-player', { left: false, right: true, jump: false }, 1)
+sweptSpikeSimulation.tick(1)
+assert.equal(sweptSpikePlayer.alive, false)
 
 const cat: PlacedTrap = {
   instanceId: 'cat-1',

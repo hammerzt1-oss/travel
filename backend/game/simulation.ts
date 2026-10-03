@@ -191,6 +191,69 @@ function overlaps(
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
 }
 
+type CollisionRect = { x: number; y: number; width: number; height: number }
+
+/**
+ * Test the complete movement segment against a rectangle expanded by the
+ * player's collider. Thin APK trigger strips are easy to cross between two
+ * fixed snapshots, especially when the client is recovering from a mobile
+ * network stall. The source controller's swept ray pass still sees that
+ * contact, so the authoritative simulation must keep the same continuity.
+ */
+function sweptPlayerOverlapsRect(
+  previousX: number,
+  previousY: number,
+  currentX: number,
+  currentY: number,
+  rect: CollisionRect,
+) {
+  if (
+    overlaps(previousX, previousY, PLAYER_WIDTH, PLAYER_HEIGHT, rect.x, rect.y, rect.width, rect.height) ||
+    overlaps(currentX, currentY, PLAYER_WIDTH, PLAYER_HEIGHT, rect.x, rect.y, rect.width, rect.height)
+  ) return true
+
+  const minX = rect.x - PLAYER_WIDTH
+  const maxX = rect.x + rect.width
+  const minY = rect.y - PLAYER_HEIGHT
+  const maxY = rect.y + rect.height
+  const deltaX = currentX - previousX
+  const deltaY = currentY - previousY
+  let enter = 0
+  let exit = 1
+
+  const clipAxis = (start: number, delta: number, min: number, max: number) => {
+    if (Math.abs(delta) < 0.000001) return start >= min && start <= max
+    let first = (min - start) / delta
+    let last = (max - start) / delta
+    if (first > last) [first, last] = [last, first]
+    enter = Math.max(enter, first)
+    exit = Math.min(exit, last)
+    return enter <= exit
+  }
+
+  return clipAxis(previousX, deltaX, minX, maxX) && clipAxis(previousY, deltaY, minY, maxY)
+}
+
+function sweptPlayerOverlapsCircle(
+  previousX: number,
+  previousY: number,
+  currentX: number,
+  currentY: number,
+  centerX: number,
+  centerY: number,
+  radius: number,
+) {
+  const distance = Math.hypot(currentX - previousX, currentY - previousY)
+  const steps = Math.max(1, Math.ceil(distance / 4))
+  for (let index = 0; index <= steps; index += 1) {
+    const progress = index / steps
+    const x = previousX + (currentX - previousX) * progress
+    const y = previousY + (currentY - previousY) * progress
+    if (circleOverlapsRect(centerX, centerY, radius, x, y, PLAYER_WIDTH, PLAYER_HEIGHT)) return true
+  }
+  return false
+}
+
 function circleOverlapsRect(
   centerX: number,
   centerY: number,
@@ -1073,15 +1136,20 @@ export class GameSimulation {
     if (this.isComplete()) return
     this.elapsed = Math.min(PLAY_DURATION_SECONDS, this.elapsed + dt)
     this.updateSwitches()
-    this.updateTrapStates()
     this.updateSurfaceStates()
     this.updateGasStates()
     this.updateProjectiles(dt)
+    const previousPositions = new Map<string, { x: number; y: number }>()
     for (const player of this.players.values()) {
       if (player.bot) this.updateBotInput(player)
+      previousPositions.set(player.id, { x: player.x, y: player.y })
       player.lastProcessedInputSequence = player.pendingInputSequence
       this.tickPlayer(player, dt)
     }
+    // Trigger components receive the same movement segment as the character
+    // controller. This catches an enter event even when the body crossed the
+    // trigger between two fixed snapshots.
+    this.updateTrapStates(previousPositions)
     this.resolvePlayerCollision()
     if (this.elapsed >= PLAY_DURATION_SECONDS) {
       for (const player of this.players.values()) {
@@ -1091,13 +1159,29 @@ export class GameSimulation {
   }
 
   isComplete() {
+    const humanPlayers = Array.from(this.players.values()).filter((player) => !player.bot)
+    const playersToFinish = humanPlayers.length > 0 ? humanPlayers : Array.from(this.players.values())
     return (
-      Array.from(this.players.values()).every((player) => !player.alive || player.finished) ||
+      playersToFinish.every((player) => !player.alive || player.finished) ||
       this.elapsed >= PLAY_DURATION_SECONDS
     )
   }
 
   result(): RoundResult {
+    // In League single-player the AI opponent is only a race target. A human
+    // death or finish ends that run immediately; close an unfinished bot as a
+    // timeout so it cannot block the result or be reported as trap-killed.
+    const humanPlayers = Array.from(this.players.values()).filter((player) => !player.bot)
+    if (humanPlayers.length > 0 && humanPlayers.every((player) => !player.alive || player.finished)) {
+      for (const player of this.players.values()) {
+        if (!player.bot || !player.alive || player.finished) continue
+        player.alive = false
+        player.timedOut = true
+        player.deadAt = this.elapsed
+        player.velocityX = 0
+        player.velocityY = 0
+      }
+    }
     const ordered = Array.from(this.players.values()).sort((a, b) => {
       if (a.finished !== b.finished) return a.finished ? -1 : 1
       const aTime = a.finishedAt ?? a.deadAt ?? Number.MAX_SAFE_INTEGER
@@ -1443,6 +1527,12 @@ export class GameSimulation {
       if (trap.trapId === 'spring') continue
       if (trap.trapId === 'spikeball') {
         const center = trapEntityCenter(trap, this.elapsed)
+        const spikeballBounds = {
+          x: center.x - 17.5,
+          y: center.y - 17.5,
+          width: 35,
+          height: 35,
+        }
         if (circleOverlapsRect(
           center.x,
           center.y,
@@ -1451,7 +1541,7 @@ export class GameSimulation {
           player.y,
           PLAYER_WIDTH,
           PLAYER_HEIGHT,
-        )) {
+        ) || sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, spikeballBounds)) {
           this.kill(player, trap.ownerId)
           return
         }
@@ -1459,6 +1549,12 @@ export class GameSimulation {
       }
       if (trap.trapId === 'linearsaw') {
         const center = linearSawWorldCenter(trap, this.elapsed)
+        const sawBounds = {
+          x: center.x - PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius,
+          y: center.y - PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius,
+          width: PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius * 2,
+          height: PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius * 2,
+        }
         if (circleOverlapsRect(
           center.x,
           center.y,
@@ -1467,13 +1563,20 @@ export class GameSimulation {
           player.y,
           PLAYER_WIDTH,
           PLAYER_HEIGHT,
-        )) {
+        ) || sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, sawBounds)) {
           this.kill(player, trap.ownerId)
           return
         }
         continue
       }
       for (const rect of rects) {
+        const sweptContact = sweptPlayerOverlapsRect(
+          previousX,
+          previousY,
+          player.x,
+          player.y,
+          rect,
+        )
         const touchingTop =
           player.y + PLAYER_HEIGHT >= rect.y &&
           player.y + PLAYER_HEIGHT <= rect.y + rect.height + 4 &&
@@ -1489,7 +1592,7 @@ export class GameSimulation {
             rect.y,
             rect.width,
             rect.height,
-          )
+          ) || sweptContact
         ) {
           this.applyTrapEffect(player, trap, definition.effect)
           if (!player.alive || player.finished) return
@@ -1540,15 +1643,12 @@ export class GameSimulation {
         width: finishWidth,
         height: finishHeight,
       }
-      const insideFinish = overlaps(
+      const insideFinish = sweptPlayerOverlapsRect(
+        previousX,
+        previousY,
         player.x,
         player.y,
-        PLAYER_WIDTH,
-        PLAYER_HEIGHT,
-        finishTrigger.x,
-        finishTrigger.y,
-        finishTrigger.width,
-        finishTrigger.height,
+        finishTrigger,
       )
       const wasInsideFinish = this.finishTriggerOccupants.has(player.id)
       if (insideFinish) this.finishTriggerOccupants.add(player.id)
@@ -1934,7 +2034,7 @@ export class GameSimulation {
     return 'idle'
   }
 
-  private updateTrapStates() {
+  private updateTrapStates(previousPositions: Map<string, { x: number; y: number }>) {
     for (const trap of this.placedTraps) {
       if (!['fortunecat', 'triggerhazard', 'triggerspikes'].includes(trap.trapId)) continue
       const started = this.trapActivationAt.get(trap.instanceId)
@@ -1954,7 +2054,13 @@ export class GameSimulation {
         let inside = false
         if (trap.trapId === 'fortunecat') {
           const trigger = trapActivationRect(trap, this.elapsed)
-          inside = Boolean(trigger && overlaps(body.x, body.y, body.width, body.height, trigger.x, trigger.y, trigger.width, trigger.height))
+          inside = Boolean(trigger && sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            trigger,
+          ))
         }
         if (trap.trapId === 'triggerhazard') {
           inside = circleOverlapsRect(
@@ -1965,26 +2071,28 @@ export class GameSimulation {
             body.y,
             body.width,
             body.height,
+          ) || sweptPlayerOverlapsCircle(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            cell.x + CELL_SIZE / 2,
+            cell.y + CELL_SIZE / 2,
+            CELL_SIZE / 2,
           )
         }
         if (trap.trapId === 'triggerspikes') {
           // The APK triggers spring spikes from the matching collision face.
           const bounds = trapOccupiedBounds(trap, this.elapsed)
           if (!bounds) continue
-          switch (trap.rotation) {
-            case 90:
-              inside = body.x <= bounds.x + bounds.width + 2 && body.x >= bounds.x + bounds.width - 8 && body.y + body.height > bounds.y && body.y < bounds.y + bounds.height
-              break
-            case 180:
-              inside = body.y <= bounds.y + bounds.height + 2 && body.y >= bounds.y + bounds.height - 8 && body.x + body.width > bounds.x && body.x < bounds.x + bounds.width
-              break
-            case 270:
-              inside = body.x + body.width >= bounds.x - 2 && body.x + body.width <= bounds.x + 8 && body.y + body.height > bounds.y && body.y < bounds.y + bounds.height
-              break
-            default:
-              inside = body.y + body.height >= bounds.y - 2 && body.y + body.height <= bounds.y + 8 && body.x + body.width > bounds.x && body.x < bounds.x + bounds.width
-              break
-          }
+          const spikeFace = springSpikesHazardRect(trap, this.elapsed)
+          inside = Boolean(spikeFace && sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            spikeFace,
+          ))
         }
         if (inside) {
           if (!this.trapTriggerOccupants.has(key)) shouldActivate = true
