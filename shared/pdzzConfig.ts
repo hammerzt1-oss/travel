@@ -29325,7 +29325,7 @@ export function getPdzzMap(mapId: string | null | undefined) { return PDZZ_MAPS.
 export function getPdzzCharacterForSlot(slot: number) { return PDZZ_CHARACTERS[(Math.max(1, slot) - 1) % PDZZ_CHARACTERS.length] ?? PDZZ_CHARACTERS[0] }
 
 /**
- * The twelve components used by the league build phase. The mechanics and
+ * The thirteen components used by the league build phase. The mechanics and
  * wording below are taken from the extracted APK creators, rather than from
  * the generic editor catalog descriptions.
  */
@@ -29338,6 +29338,7 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'spike',
   'spring',
   'spikeball',
+  'linearsaw',
   'hunterguard',
   'gravityflip',
   'flashblind',
@@ -29395,6 +29396,11 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
     id: 'spikeball',
     functionText: '碰到刺球圆形伤害区立即淘汰。',
     configuration: '1×1 格；自由朝向；圆形伤害碰撞半径为 17.5 px（50×0.5×0.7）。',
+  },
+  {
+    id: 'linearsaw',
+    functionText: '水平锯沿放置平台的方向往返移动，锯片碰到动物立即淘汰。',
+    configuration: '5×1 格；底座是完整平台碰撞体；锯片沿本体方向往返 200 px，速度 100 px/s，持续旋转；底座阻挡角色，移动锯片单独判定伤害。',
   },
   {
     id: 'hunterguard',

@@ -29,6 +29,8 @@ const createdState = lastRoomState(host.roomId)
 assert.ok(createdState)
 assert.equal(createdState.state.players[0]?.ready, true)
 assert.equal(createdState.state.playerCollisionEnabled, false)
+assert.equal(createdState.state.selectedMapId, 'levelhaystack2')
+assert.equal(createdState.state.mapMode, 'specific')
 
 manager.handle('socket-host', { type: 'set_player_collision', enabled: true })
 const collisionEnabledState = lastRoomState(host.roomId)
@@ -110,6 +112,9 @@ assert.equal(placementState?.buildState?.options.length, 6)
 assert.equal(new Set(placementState?.buildState?.options.map((option) => option.id)).size, 6)
 assert.ok(placementState?.buildState?.options.every((option) => PDZZ_LEAGUE_COMPONENT_IDS.includes(option.id as typeof PDZZ_LEAGUE_COMPONENT_IDS[number])))
 assert.ok(placementState?.buildState?.options.every((option) => option.id !== 'ice' && option.id !== 'mud'))
+for (const guaranteedId of ['gravityflip', 'flashblind', 'guillotineaxe', 'hunterguard', 'linearsaw']) {
+  assert.ok(placementState?.buildState?.options.some((option) => option.id === guaranteedId), `${guaranteedId} missing from round options`)
+}
 const firstOption = placementState?.buildState?.options[0]
 assert.ok(firstOption)
 placementManager.handle('placement-host', { type: 'select_trap', trapId: firstOption.id })

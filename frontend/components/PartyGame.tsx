@@ -1051,12 +1051,12 @@ export default function PartyGame() {
               <section className="pdzz-component-guide" aria-label="原作机关说明">
                 <div className="pdzz-component-guide-heading">
                   <strong>原作机关配置</strong>
-                  <span>滑动查看全部 12 个</span>
+                  <span>滑动查看全部 13 个</span>
                 </div>
                 <div className="pdzz-component-guide-list">
                   {PDZZ_LEAGUE_COMPONENT_GUIDE.map((guide) => {
-                    // The drawer contains six random options; the reference
-                    // strip must still describe all twelve league components.
+                    // The drawer contains six round options; the reference
+                    // strip still describes the complete league component set.
                     const option = build?.options.find((item) => item.id === guide.id)
                       ?? PDZZ_COMPONENTS.find((item) => item.id === guide.id)
                     return (

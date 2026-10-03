@@ -313,6 +313,7 @@ linearSawHitPlayer.onGround = false
 linearSawHitPlayer.velocityY = 0
 linearSawHitSimulation.tick(1 / 60)
 assert.equal(linearSawHitPlayer.alive, false)
+assert.equal(linearSawHitSimulation.snapshot('PLAYING').players[0]?.deathTrapId, 'linearsaw')
 
 // The hunter guard is a 1x1 moving hazard. It resolves the complete
 // same-height platform run containing its placement, but never crosses a

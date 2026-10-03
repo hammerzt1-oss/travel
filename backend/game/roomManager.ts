@@ -119,15 +119,23 @@ function isRotation(value: unknown): value is Rotation {
 }
 
 function makeOptions() {
-  // The APK keeps a candidate pool, then generatePartyComponents() picks six
-  // unique entries for each round. Keep the extracted league pool available to the guide while
-  // exposing the same six-card build selection shown by the original match.
-  const ids = [...PDZZ_LEAGUE_COMPONENT_IDS]
+  // Keep the four newly implemented components and the horizontal saw visible
+  // in every round. The remaining card is randomized from the rest of the
+  // league pool, while removed ice/mud entries cannot enter this list.
+  const guaranteedIds = ['gravityflip', 'flashblind', 'guillotineaxe', 'hunterguard', 'linearsaw'] as const
+  const ids = PDZZ_LEAGUE_COMPONENT_IDS.filter(
+    (id) => !guaranteedIds.includes(id as (typeof guaranteedIds)[number]),
+  )
   for (let index = ids.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1))
     ;[ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]]
   }
-  return ids.slice(0, 6).map((id) => {
+  const selectedIds = [...guaranteedIds, ...ids.slice(0, 1)]
+  for (let index = selectedIds.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    ;[selectedIds[index], selectedIds[swapIndex]] = [selectedIds[swapIndex], selectedIds[index]]
+  }
+  return selectedIds.map((id) => {
     const definition = TRAP_DEFINITIONS.find((item) => item.id === id)
     if (!definition) throw new Error(`Missing league trap definition: ${id}`)
     const guide = PDZZ_LEAGUE_COMPONENT_GUIDE_BY_ID[id]
