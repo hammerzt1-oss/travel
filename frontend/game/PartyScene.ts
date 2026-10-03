@@ -438,7 +438,11 @@ export class PartyScene extends Phaser.Scene {
     this.localPlayerId = localPlayerId
     this.currentCountdown = countdown
     if (!state || state.status !== 'PLAYING') this.localRenderPosition = null
-    if (!state) return
+    if (!state) {
+      for (const plate of this.nameplates.values()) plate.destroy()
+      this.nameplates.clear()
+      return
+    }
     this.renderState()
   }
 
