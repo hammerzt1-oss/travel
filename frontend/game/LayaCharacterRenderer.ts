@@ -67,6 +67,7 @@ type PlayerTrack = {
     wallDirection: -1 | 1
     fallingTime: number
     extraHorizontalAirSpeed: number
+    springContactId: string | null
     updatedAt: number
     correctionX: number
     correctionY: number
@@ -543,6 +544,7 @@ export class LayaCharacterRenderer {
       wallDirection: 1 as const,
       fallingTime: 0,
       extraHorizontalAirSpeed: 0,
+      springContactId: null as string | null,
       updatedAt: receivedAt,
       correctionX: 0,
       correctionY: 0,
@@ -621,6 +623,7 @@ export class LayaCharacterRenderer {
     let nextX = previousX + deltaX
     let nextY = previousY + deltaY
     let landed = false
+    let landedPlatform: Platform | null = null
     let hitCeiling = false
     let hitLeft = false
     let hitRight = false
@@ -663,6 +666,7 @@ export class LayaCharacterRenderer {
         nextY = platform.y - LOCAL_PLAYER_HEIGHT
         prediction.velocityY = 0
         landed = true
+        landedPlatform = platform
       } else if (
         deltaY < 0 &&
         previousY >= platform.y + platform.height - 1 &&
@@ -686,15 +690,42 @@ export class LayaCharacterRenderer {
     }
     prediction.x = nextX
     prediction.y = nextY
+    const springVelocity = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(
+      PDZZ_PHYSICS.componentMechanics.spring.jumpHeightMultiplier,
+    )
     if (landed) {
-      prediction.grounded = true
-      prediction.jumping = false
-      prediction.jumpStartedAt = null
+      const landedTrap = landedPlatform
+        ? this.latestState?.level.traps.find((trap) => landedPlatform?.id === `trap-prediction-${trap.instanceId}`)
+        : undefined
+      const bounced = landedTrap?.trapId === 'spring' && landedTrap.rotation === 0 && prediction.springContactId !== landedTrap.instanceId
+      if (bounced) {
+        prediction.velocityY = springVelocity
+        prediction.grounded = false
+        prediction.jumping = true
+        prediction.jumpStartedAt = now
+        prediction.springContactId = landedTrap.instanceId
+      } else {
+        prediction.springContactId = landedTrap?.trapId === 'spring' ? landedTrap.instanceId : null
+      }
+      prediction.grounded = !bounced
+      if (!bounced) {
+        prediction.jumping = false
+        prediction.jumpStartedAt = null
+      }
       prediction.onWall = false
       prediction.fallingTime = 0
     } else if (hitCeiling) {
       prediction.grounded = false
       prediction.jumping = true
+      const ceilingTrap = this.latestState?.level.traps.find((trap) =>
+        trap.trapId === 'spring' &&
+        prediction.springContactId !== trap.instanceId &&
+        Math.abs(nextY - (trap.y * (this.latestState?.level.cellSize ?? 50) + trap.height * (this.latestState?.level.cellSize ?? 50))) <= 2,
+      )
+      if (ceilingTrap?.rotation === 180) {
+        prediction.velocityY = -springVelocity / 2
+        prediction.springContactId = ceilingTrap.instanceId
+      }
     } else if (prediction.grounded) {
       const supported = platforms.some((platform) =>
         Math.abs(previousY + LOCAL_PLAYER_HEIGHT - platform.y) <= 1 &&
@@ -710,6 +741,19 @@ export class LayaCharacterRenderer {
       prediction.onWall = hitLeft || hitRight
       if (hitLeft) prediction.wallDirection = 1
       if (hitRight) prediction.wallDirection = -1
+      const sideSpring = this.latestState?.level.traps.find((trap) =>
+        trap.trapId === 'spring' && prediction.springContactId !== trap.instanceId &&
+        ((hitRight && trap.rotation === 90) || (hitLeft && trap.rotation === 270)),
+      )
+      if (sideSpring) {
+        prediction.extraHorizontalAirSpeed = sideSpring.rotation === 90
+          ? -springVelocity * PDZZ_PHYSICS.componentMechanics.spring.triggerSpringVelocityMultiplier
+          : springVelocity
+        prediction.velocityX = inputVelocityX + prediction.extraHorizontalAirSpeed
+        prediction.springContactId = sideSpring.instanceId
+      } else if (!hitLeft && !hitRight) {
+        prediction.springContactId = null
+      }
     } else {
       prediction.onWall = false
     }

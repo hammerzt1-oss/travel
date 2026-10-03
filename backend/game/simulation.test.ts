@@ -977,4 +977,77 @@ movingSimulation.tick(0.9)
 const liftInMotion = movingSimulation.snapshot('PLAYING').level.traps[0]
 assert.notEqual(liftAtStart.offsetY, liftInMotion.offsetY)
 
+const gravityFlip: PlacedTrap = {
+  instanceId: 'gravity-flip-1',
+  trapId: 'gravityflip',
+  ownerId: 'p1',
+  x: 30,
+  y: 20,
+  width: 2,
+  height: 2,
+  rotation: 0,
+  placedRound: 1,
+}
+const gravityFlipSimulation = new GameSimulation(
+  1,
+  [{ id: 'gravity-flip-player', slot: 1, label: 'Player 1', score: 0 }],
+  [gravityFlip],
+  'levelhaystack2',
+)
+const gravityFlipPlayer = gravityFlipSimulation.players.get('gravity-flip-player')
+assert.ok(gravityFlipPlayer)
+gravityFlipPlayer.x = 1510
+gravityFlipPlayer.y = 950
+gravityFlipPlayer.onGround = false
+gravityFlipSimulation.tick(1 / 60)
+assert.ok(gravityFlipPlayer.gravityFlipUntil > 0)
+assert.ok(gravityFlipPlayer.velocityY < 0)
+
+const flashBlind: PlacedTrap = {
+  instanceId: 'flash-blind-1',
+  trapId: 'flashblind',
+  ownerId: 'p1',
+  x: 30,
+  y: 20,
+  width: 2,
+  height: 1,
+  rotation: 0,
+  placedRound: 1,
+}
+const flashBlindSimulation = new GameSimulation(
+  1,
+  [{ id: 'flash-blind-player', slot: 1, label: 'Player 1', score: 0 }],
+  [flashBlind],
+  'levelhaystack2',
+)
+const flashBlindPlayer = flashBlindSimulation.players.get('flash-blind-player')
+assert.ok(flashBlindPlayer)
+flashBlindPlayer.x = 1510
+flashBlindPlayer.y = 950
+flashBlindPlayer.onGround = false
+flashBlindSimulation.tick(1 / 60)
+assert.equal(flashBlindSimulation.snapshot('PLAYING').players[0].blinded, true)
+for (let index = 0; index < 125; index += 1) flashBlindSimulation.tick(1 / 60)
+assert.equal(flashBlindSimulation.snapshot('PLAYING').players[0].blinded, false)
+
+const guillotineAtStart = new GameSimulation(
+  1,
+  [{ id: 'axe-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'guillotine-1',
+    trapId: 'guillotineaxe',
+    ownerId: 'p1',
+    x: 20,
+    y: 8,
+    width: 5,
+    height: 2,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const axeRotationAtStart = guillotineAtStart.snapshot('PLAYING').level.traps[0].visualRotation
+guillotineAtStart.tick(0.45)
+const axeRotationInMotion = guillotineAtStart.snapshot('PLAYING').level.traps[0].visualRotation
+assert.notEqual(axeRotationAtStart, axeRotationInMotion)
+
 console.log('simulation tests passed')

@@ -126,6 +126,8 @@ export type PlayerSnapshot = {
   score: number
   characterId: string
   characterAsset: string | null
+  /** The local player is currently inside the two-second flash blind effect. */
+  blinded?: boolean
   /** Highest client input sequence already consumed by the authoritative tick. */
   lastProcessedInputSequence: number
   bot?: boolean

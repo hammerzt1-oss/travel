@@ -465,6 +465,7 @@ export class PartyScene extends Phaser.Scene {
       round: state.round,
       countdown: this.currentCountdown,
       players: state.players.map((player) => ({ id: player.id, score: player.score, alive: player.alive })),
+      blinded: state.players.find((player) => player.id === this.localPlayerId)?.blinded ?? false,
     })
     if (uiSignature !== this.lastRenderedUiSignature) {
       this.drawGameUi(state)
@@ -830,6 +831,15 @@ export class PartyScene extends Phaser.Scene {
       if (!texture) return
       const guard = this.addTextureImage(container, texture, 0, 0, 1, 0.5, 1)
       guard?.setDisplaySize(cell, cell)
+      return
+    }
+
+    if (trap.trapId === 'gravityflip' || trap.trapId === 'flashblind' || trap.trapId === 'guillotineaxe') {
+      const texture = this.componentTexture(component)
+      if (!texture) return
+      const image = this.addTextureImage(container, texture, 0, 0)
+      image?.setDisplaySize(component.width * cell, component.height * cell)
+      if (trap.phase === 'active') image?.setTint(trap.trapId === 'flashblind' ? 0xffffff : 0x9ff8ff)
       return
     }
 
@@ -1361,6 +1371,15 @@ export class PartyScene extends Phaser.Scene {
     ;[...state.players]
       .sort((left, right) => left.slot - right.slot)
       .forEach((player, index) => drawHud(player, index))
+
+    const localPlayer = state.players.find((player) => player.id === this.localPlayerId)
+    if (localPlayer?.blinded) {
+      this.uiObjects.push(
+        this.add.rectangle(width / 2, this.scale.height / 2, width, this.scale.height, 0xffffff, 0.96)
+          .setScrollFactor(0)
+          .setDepth(100),
+      )
+    }
 
     const timerValue = this.hudTimerValue()
     if (timerValue !== null) {

@@ -2,7 +2,7 @@
 export type PdzzTrapEffect = 'kill' | 'ice' | 'bounce' | 'slow' | 'teleport' | 'wall' | 'boost' | 'wind' | 'reverse'
 export type PdzzMapElement = {} & { id: string; index: number; position: { x: number; y: number }; angle: number; semanticKey: string; extension: { tag: string; sprite: string; spriteX: number; spriteY: number; scale: number; flipX: boolean; flipY: boolean; zOrder: number; alpha: number; isSliced: boolean; slicedWidth: number; slicedHeight: number }; collider: { shape: 'box' | 'circle'; width: number | null; height: number | null; radius: number | null; rotation: number; hazard: boolean; colliderType: number } | null }
 export type PdzzMapDefinition = { id: string; sourceId: string; name: string; available: boolean; supportTeamBattle: boolean; supportAIBattle: boolean; noFlag?: boolean; minX: number; minY: number; width: number; height: number; editMinX?: number; editMinY?: number; editWidth?: number; editHeight?: number; spawnX: number; spawnY: number; finishX: number; finishY: number; secondarySpawnPoints?: Array<{ x: number; y: number }>; secondaryFinishPoints?: Array<{ x: number; y: number }>; backgroundAsset: string | null; thumbnailAsset: string | null; atlasAsset: string | null; atlasImageAsset: string | null; skySprite: string | null; spriteAssets: Record<string, string>; elements: PdzzMapElement[] }
-export type PdzzComponentDefinition = { id: string; name: string; description: string; width: number; height: number; viewWidth: number; viewHeight: number; cells: number[][]; glyph: string; color: string; placement: 'free' | 'supported'; effect: PdzzTrapEffect; collisionMode: 'solid' | 'trigger' | 'hybrid' | 'none'; category: string; sourceType: string; componentType: number; defaultDir: number; rotateMode: number; snapToGround: boolean; fullrect: boolean; danToUnlock: number; isVip: boolean; available: boolean; iconSource: 'game' | 'component' | null; iconFrame: string | null; iconAsset: string | null; iconCrop: { x: number; y: number; width: number; height: number } | null; iconConfidence: 'exact' | 'alias' | 'missing'; maxCountInLevel: number }
+export type PdzzComponentDefinition = { id: string; name: string; description: string; width: number; height: number; viewWidth: number; viewHeight: number; cells: number[][]; glyph: string; color: string; placement: 'free' | 'supported'; effect: PdzzTrapEffect; collisionMode: 'solid' | 'trigger' | 'hybrid' | 'none'; category: string; sourceType: string; componentType: number; defaultDir: number; rotateMode: number; snapToGround: boolean; fullrect: boolean; danToUnlock: number; isVip: boolean; available: boolean; iconSource: 'game' | 'component' | null; iconFrame: string | null; iconAsset: string | null; iconCrop: { x: number; y: number; width: number; height: number } | null; iconConfidence: 'exact' | 'alias' | 'missing' | 'generated'; maxCountInLevel: number }
 export type PdzzCharacterDefinition = { id: string; refID: string; name: string; description: string; avatarID: string; imageAsset: string | null; available: boolean }
 export const PDZZ_PHYSICS = {
   "fixedTimeStepMs": 17,
@@ -101,6 +101,22 @@ export const PDZZ_PHYSICS = {
     },
     "hunterGuard": {
       "speed": 90
+    },
+    "gravityFlip": {
+      "durationSeconds": 1.2,
+      "triggerWidthCells": 2,
+      "triggerHeightCells": 2
+    },
+    "flashBlind": {
+      "durationSeconds": 2,
+      "triggerWidthCells": 3,
+      "triggerHeightCells": 2
+    },
+    "guillotineAxe": {
+      "swingDegrees": 35,
+      "swingPeriodSeconds": 1.8,
+      "bladeWidthCells": 1.8,
+      "bladeHeightCells": 0.55
     }
   }
 } as const
@@ -26918,6 +26934,99 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "maxCountInLevel": 0
   },
   {
+    "id": "gravityflip",
+    "name": "重力翻转板",
+    "description": "gizmo · 踩上后将角色重力翻转到屏幕上方",
+    "width": 2,
+    "height": 2,
+    "viewWidth": 2,
+    "viewHeight": 2,
+    "cells": [[0, 0], [1, 0], [0, 1], [1, 1]],
+    "glyph": "^",
+    "color": "#22b9dc",
+    "placement": "free",
+    "effect": "wall",
+    "collisionMode": "hybrid",
+    "category": "gizmo",
+    "sourceType": "gizmo",
+    "componentType": 3,
+    "defaultDir": 1,
+    "rotateMode": 1,
+    "snapToGround": false,
+    "fullrect": true,
+    "danToUnlock": 0,
+    "isVip": false,
+    "available": true,
+    "iconSource": "component",
+    "iconFrame": "gravityflip.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/gravityflip.png",
+    "iconCrop": { "x": 0, "y": 0, "width": 2048, "height": 2048 },
+    "iconConfidence": "generated",
+    "maxCountInLevel": 0
+  },
+  {
+    "id": "flashblind",
+    "name": "闪光致盲灯",
+    "description": "hazard · 靠近时闪光，短暂遮挡视野但不造成伤害",
+    "width": 2,
+    "height": 1,
+    "viewWidth": 2,
+    "viewHeight": 1,
+    "cells": [[0, 0], [1, 0]],
+    "glyph": "*",
+    "color": "#ffd34a",
+    "placement": "free",
+    "effect": "wall",
+    "collisionMode": "hybrid",
+    "category": "hazard",
+    "sourceType": "hazard",
+    "componentType": 6,
+    "defaultDir": 1,
+    "rotateMode": 1,
+    "snapToGround": false,
+    "fullrect": true,
+    "danToUnlock": 0,
+    "isVip": false,
+    "available": true,
+    "iconSource": "component",
+    "iconFrame": "flashblind.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/flashblind.png",
+    "iconCrop": { "x": 0, "y": 0, "width": 2048, "height": 2048 },
+    "iconConfidence": "generated",
+    "maxCountInLevel": 0
+  },
+  {
+    "id": "guillotineaxe",
+    "name": "断头摆斧",
+    "description": "hazard · 巨斧沿圆弧来回摆动，碰到斧身立即淘汰",
+    "width": 5,
+    "height": 2,
+    "viewWidth": 5,
+    "viewHeight": 2,
+    "cells": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1]],
+    "glyph": "!",
+    "color": "#e35d58",
+    "placement": "free",
+    "effect": "kill",
+    "collisionMode": "hybrid",
+    "category": "hazard",
+    "sourceType": "hazard",
+    "componentType": 6,
+    "defaultDir": 1,
+    "rotateMode": 1,
+    "snapToGround": false,
+    "fullrect": true,
+    "danToUnlock": 0,
+    "isVip": false,
+    "available": true,
+    "iconSource": "component",
+    "iconFrame": "guillotineaxe.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/guillotineaxe.png",
+    "iconCrop": { "x": 0, "y": 0, "width": 2048, "height": 2048 },
+    "iconConfidence": "generated",
+    "maxCountInLevel": 0
+  },
+  {
     "id": "platformsaw",
     "name": "圆锯平台",
     "description": "hazard · 来自 APK 组件配置",
@@ -29213,7 +29322,7 @@ export function getPdzzMap(mapId: string | null | undefined) { return PDZZ_MAPS.
 export function getPdzzCharacterForSlot(slot: number) { return PDZZ_CHARACTERS[(Math.max(1, slot) - 1) % PDZZ_CHARACTERS.length] ?? PDZZ_CHARACTERS[0] }
 
 /**
- * The nine components used by the league build phase. The mechanics and
+ * The twelve components used by the league build phase. The mechanics and
  * wording below are taken from the extracted APK creators, rather than from
  * the generic editor catalog descriptions.
  */
@@ -29227,6 +29336,9 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'spring',
   'spikeball',
   'hunterguard',
+  'gravityflip',
+  'flashblind',
+  'guillotineaxe',
 ] as const
 
 /** Ground hazards and the patrol enemy must be placed on a platform top. */
@@ -29285,6 +29397,21 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
     id: 'hunterguard',
     functionText: '放在地面后自动识别这一行连续的水平地面段，在段内随机方向巡逻，碰到动物立即淘汰。',
     configuration: '1×1 格；必须贴在平台顶面；只合并同一高度且相接的水平平台；巡逻边界为该连续地面段的左右端点，不跨越断点；速度 90 px/s，实例使用稳定随机初始方向，触碰框为移动中的 1×1 格。',
+  },
+  {
+    id: 'gravityflip',
+    functionText: '踩上翻转板后，角色重力朝屏幕上方，持续 1.2 秒，期间会被吸向上方。',
+    configuration: '2×2 格；混合碰撞体；进入占用区域只触发一次；重力方向翻转 1.2 秒，触发时脱离当前支撑面。',
+  },
+  {
+    id: 'flashblind',
+    functionText: '玩家靠近时触发强光，屏幕短暂变白，看不清地图但不会受伤。',
+    configuration: '2×1 格；靠近范围 3×2 格；进入范围触发一次；致盲 2 秒；不改变速度、不造成伤害，离开后重新进入才可再次触发。',
+  },
+  {
+    id: 'guillotineaxe',
+    functionText: '巨大斧头沿圆弧往返摆动，斧身碰到角色立即淘汰。',
+    configuration: '5×2 格；摆幅 ±35°；1.8 秒一个往返周期；斧刃碰撞盒 1.8×0.55 格，随摆角旋转；底座和链条按组件实体阻挡。',
   },
 ]
 

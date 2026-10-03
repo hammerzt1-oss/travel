@@ -67,6 +67,8 @@ type SimPlayer = {
   gasExitUntil: number
   freezeUntil: number
   lowGravityUntil: number
+  gravityFlipUntil: number
+  blindUntil: number
   inIce: boolean
   inMud: boolean
   springJump: boolean
@@ -538,6 +540,10 @@ const LINEAR_SAW_SPEED = PDZZ_PHYSICS.componentMechanics.linearSaw.speed
 const LINEAR_SAW_MAX_OFFSET = PDZZ_PHYSICS.componentMechanics.linearSaw.travelPixels
 const LINEAR_SAW_SPIN_DEGREES_PER_SECOND = PDZZ_PHYSICS.componentMechanics.linearSaw.spinDegreesPerSecond
 const HUNTER_GUARD_SPEED = PDZZ_PHYSICS.componentMechanics.hunterGuard.speed
+const GRAVITY_FLIP_DURATION = PDZZ_PHYSICS.componentMechanics.gravityFlip.durationSeconds
+const FLASH_BLIND_DURATION = PDZZ_PHYSICS.componentMechanics.flashBlind.durationSeconds
+const GUILLOTINE_SWING_DEGREES = PDZZ_PHYSICS.componentMechanics.guillotineAxe.swingDegrees
+const GUILLOTINE_SWING_PERIOD = PDZZ_PHYSICS.componentMechanics.guillotineAxe.swingPeriodSeconds
 
 function linearSawPingPong(elapsed: number) {
   // APK Cf mover: pingPong(elapsed * speed / offset, 1), then sineInOut.
@@ -623,14 +629,17 @@ function trapMotion(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LE
   const wave = Math.sin(elapsed * (Math.PI * 2 / 3.6) + phase)
   const saw = trap.trapId === 'linearsaw' ? linearSawMotion(trap, elapsed) : null
   const hunter = trap.trapId === 'hunterguard' ? hunterGuardMotion(trap, elapsed, level) : null
+  const guillotine = trap.trapId === 'guillotineaxe'
+    ? trap.rotation + Math.sin((elapsed * Math.PI * 2) / GUILLOTINE_SWING_PERIOD + phase) * GUILLOTINE_SWING_DEGREES
+    : null
   return {
     offsetX: hunter?.x ?? (movingHorizontal.has(trap.trapId)
       ? wave * 150
       : 0),
     offsetY: hunter?.y ?? (movingVertical.has(trap.trapId) ? Math.max(0, wave) * 150 : 0),
-    visualRotation: hunter?.rotation ?? (rotating.has(trap.trapId)
+    visualRotation: hunter?.rotation ?? (guillotine ?? (rotating.has(trap.trapId)
       ? trap.rotation + (trap.trapId === 'swingsaw' ? wave * 60 : wave * 25)
-      : trap.rotation),
+      : trap.rotation)),
     movingOffsetX: saw?.x ?? 0,
     movingOffsetY: saw?.y ?? 0,
     movingRotation: saw?.rotation ?? trap.rotation,
@@ -930,6 +939,48 @@ function springSpikesHazardRect(trap: PlacedTrap, elapsed: number, level: LevelS
   }
 }
 
+function rotatedAabb(centerX: number, centerY: number, width: number, height: number, angleDegrees: number): TrapRect {
+  const angle = (angleDegrees * Math.PI) / 180
+  const halfWidth = width / 2
+  const halfHeight = height / 2
+  const extentX = Math.abs(Math.cos(angle) * halfWidth) + Math.abs(Math.sin(angle) * halfHeight)
+  const extentY = Math.abs(Math.sin(angle) * halfWidth) + Math.abs(Math.cos(angle) * halfHeight)
+  return {
+    x: centerX - extentX,
+    y: centerY - extentY,
+    width: extentX * 2,
+    height: extentY * 2,
+  }
+}
+
+function guillotineAxeHazardRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect {
+  const motion = trapMotion(trap, elapsed, level)
+  const center = trapEntityCenter(trap, elapsed, level)
+  const angle = motion.visualRotation ?? trap.rotation
+  const radians = (angle * Math.PI) / 180
+  const bladeOffset = 0.65 * CELL_SIZE
+  return rotatedAabb(
+    center.x - Math.sin(radians) * bladeOffset,
+    center.y + Math.cos(radians) * bladeOffset,
+    PDZZ_PHYSICS.componentMechanics.guillotineAxe.bladeWidthCells * CELL_SIZE,
+    PDZZ_PHYSICS.componentMechanics.guillotineAxe.bladeHeightCells * CELL_SIZE,
+    angle,
+  )
+}
+
+function flashBlindTriggerRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect {
+  const center = trapEntityCenter(trap, elapsed, level)
+  return orientedRect(
+    center.x,
+    center.y,
+    PDZZ_PHYSICS.componentMechanics.flashBlind.triggerWidthCells * CELL_SIZE,
+    PDZZ_PHYSICS.componentMechanics.flashBlind.triggerHeightCells * CELL_SIZE,
+    0,
+    0,
+    trap.rotation,
+  )
+}
+
 function trapActivationRect(trap: PlacedTrap, elapsed: number) {
   if (trap.trapId === 'fortunecat') return fortuneCatTriggerRect(trap, elapsed)
   return null
@@ -1166,6 +1217,8 @@ export class GameSimulation {
             gasExitUntil: 0,
             freezeUntil: 0,
             lowGravityUntil: 0,
+            gravityFlipUntil: 0,
+            blindUntil: 0,
             inIce: false,
             inMud: false,
             springJump: false,
@@ -1445,8 +1498,10 @@ export class GameSimulation {
     // The original calculates jump/fall gravity before applying velocity. A
     // held jump uses normal gravity during ascent; after the apex it switches
     // to fall gravity. Wall gravity only begins once wall cling is armed.
-    const gravity = player.lowGravityUntil > this.elapsed
-      ? PHYSICS.playerDerived.gravity * 0.22
+    const gravity = player.gravityFlipUntil > this.elapsed
+      ? -PHYSICS.playerDerived.gravity
+      : player.lowGravityUntil > this.elapsed
+        ? PHYSICS.playerDerived.gravity * 0.22
       : wallClinging
         ? PHYSICS.playerDerived.gravity * (
           player.inIce
@@ -1600,6 +1655,17 @@ export class GameSimulation {
       // Springs are solid platforms. Their effect is driven by the contacted
       // collision face, so body overlap must not trigger them a second time.
       if (trap.trapId === 'spring') continue
+      if (trap.trapId === 'guillotineaxe') {
+        const blade = guillotineAxeHazardRect(trap, this.elapsed, this.level)
+        if (
+          overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, blade.x, blade.y, blade.width, blade.height) ||
+          sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, blade)
+        ) {
+          this.kill(player, trap.ownerId)
+          return
+        }
+        continue
+      }
       if (trap.trapId === 'spikeball') {
         const center = trapEntityCenter(trap, this.elapsed, this.level)
         const spikeballBounds = {
@@ -1855,7 +1921,7 @@ export class GameSimulation {
     const activeContacts = new Set<string>()
     for (const trap of this.placedTraps) {
       if (trap.trapId !== 'spring') continue
-      const rects = springPlatformRects(trap, this.elapsed)
+      const rects = springPlatformRects(trap, this.elapsed, this.level)
       for (const rect of rects) {
         const verticalOverlap = player.y + PLAYER_HEIGHT > rect.y && player.y < rect.y + rect.height
         const horizontalOverlap = player.x + PLAYER_WIDTH > rect.x && player.x < rect.x + rect.width
@@ -2106,17 +2172,26 @@ export class GameSimulation {
       if (age < 3.55) return 'active'
       return 'reverting'
     }
+    if (trap.trapId === 'gravityflip') return age < GRAVITY_FLIP_DURATION ? 'active' : 'reverting'
+    if (trap.trapId === 'flashblind') return age < FLASH_BLIND_DURATION ? 'active' : 'reverting'
     return 'idle'
   }
 
   private updateTrapStates(previousPositions: Map<string, { x: number; y: number }>) {
     for (const trap of this.placedTraps) {
-      if (!['fortunecat', 'triggerhazard', 'triggerspikes'].includes(trap.trapId)) continue
+      if (!['fortunecat', 'triggerhazard', 'triggerspikes', 'gravityflip', 'flashblind'].includes(trap.trapId)) continue
       const started = this.trapActivationAt.get(trap.instanceId)
       if (started !== undefined) {
-        const lifetime = trap.trapId === 'triggerspikes' ? 3.6 : trap.trapId === 'fortunecat' ? 1.8 : 2.1
+        const lifetime = trap.trapId === 'triggerspikes'
+          ? 3.6
+          : trap.trapId === 'fortunecat'
+            ? 1.8
+            : trap.trapId === 'triggerhazard'
+              ? 2.1
+              : trap.trapId === 'gravityflip'
+                ? GRAVITY_FLIP_DURATION
+                : FLASH_BLIND_DURATION
         if (this.elapsed - started >= lifetime) this.trapActivationAt.delete(trap.instanceId)
-        continue
       }
       const cells = trapCellRects(trap, this.elapsed, this.level)
       const cell = cells[0]
@@ -2176,14 +2251,46 @@ export class GameSimulation {
             spikeFace,
           ))
         }
+        if (trap.trapId === 'gravityflip') {
+          inside = cells.some((occupiedCell) => sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            occupiedCell,
+          ))
+        }
+        if (trap.trapId === 'flashblind') {
+          const trigger = flashBlindTriggerRect(trap, this.elapsed, this.level)
+          inside = sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            trigger,
+          )
+        }
         if (inside) {
-          if (!this.trapTriggerOccupants.has(key)) shouldActivate = true
+          const entered = !this.trapTriggerOccupants.has(key)
+          if (entered) {
+            shouldActivate = true
+            if (trap.trapId === 'gravityflip') {
+              player.gravityFlipUntil = this.elapsed + GRAVITY_FLIP_DURATION
+              player.onGround = false
+              player.supportId = null
+              player.velocityY = Math.min(player.velocityY, -180)
+            } else if (trap.trapId === 'flashblind') {
+              player.blindUntil = Math.max(player.blindUntil, this.elapsed + FLASH_BLIND_DURATION)
+            }
+          }
           this.trapTriggerOccupants.add(key)
         } else {
           this.trapTriggerOccupants.delete(key)
         }
       }
-      if (shouldActivate) this.trapActivationAt.set(trap.instanceId, this.elapsed)
+      if (shouldActivate && this.trapActivationAt.get(trap.instanceId) === undefined) {
+        this.trapActivationAt.set(trap.instanceId, this.elapsed)
+      }
     }
   }
 
@@ -2424,6 +2531,7 @@ export class GameSimulation {
       score: player.score,
       characterId: player.characterId,
       characterAsset: player.characterAsset,
+      blinded: player.blindUntil > this.elapsed,
       lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,
     }
