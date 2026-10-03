@@ -449,7 +449,7 @@ function buildAiPath(level: LevelSnapshot, traps: PlacedTrap[] = []) {
         other.id !== platform.id && overlaps(body.x, body.y, body.width, body.height, other.x, other.y, other.width, other.height),
       ) || traps.some((trap) => {
         const definition = trapDefinition(trap.trapId)
-        return definition?.collisionMode !== 'none' && trapCellRects(trap, 0).some((rect) =>
+        return definition?.collisionMode !== 'none' && trap.trapId !== 'hunterguard' && trapCellRects(trap, 0).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         )
       })
@@ -537,6 +537,7 @@ function trapRequiresGroundSupport(trapId: string, definition: TrapDefinition) {
 const LINEAR_SAW_SPEED = PDZZ_PHYSICS.componentMechanics.linearSaw.speed
 const LINEAR_SAW_MAX_OFFSET = PDZZ_PHYSICS.componentMechanics.linearSaw.travelPixels
 const LINEAR_SAW_SPIN_DEGREES_PER_SECOND = PDZZ_PHYSICS.componentMechanics.linearSaw.spinDegreesPerSecond
+const HUNTER_GUARD_SPEED = PDZZ_PHYSICS.componentMechanics.hunterGuard.speed
 
 function linearSawPingPong(elapsed: number) {
   // APK Cf mover: pingPong(elapsed * speed / offset, 1), then sineInOut.
@@ -560,29 +561,84 @@ function linearSawMotion(trap: PlacedTrap, elapsed: number) {
   }
 }
 
-function trapMotion(trap: PlacedTrap, elapsed: number) {
+type HorizontalGroundSegment = { left: number; right: number; groundY: number }
+
+function stableTrapSeed(instanceId: string) {
+  let hash = 2166136261
+  for (let index = 0; index < instanceId.length; index += 1) {
+    hash ^= instanceId.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function horizontalGroundSegments(level: LevelSnapshot, groundY: number): HorizontalGroundSegment[] {
+  const platforms = level.platforms
+    .filter((platform) => Math.abs(platform.y - groundY) <= 0.5 && platform.width > 0)
+    .sort((left, right) => left.x - right.x)
+  const segments: HorizontalGroundSegment[] = []
+  for (const platform of platforms) {
+    const previous = segments[segments.length - 1]
+    const right = platform.x + platform.width
+    if (previous && platform.x <= previous.right + 0.5) {
+      previous.right = Math.max(previous.right, right)
+    } else {
+      segments.push({ left: platform.x, right, groundY })
+    }
+  }
+  return segments
+}
+
+function hunterGuardMotion(trap: PlacedTrap, elapsed: number, level: LevelSnapshot) {
+  const groundY = trap.y * CELL_SIZE + trap.height * CELL_SIZE
+  const segments = horizontalGroundSegments(level, groundY)
+  const trapLeft = trap.x * CELL_SIZE
+  const trapRight = trapLeft + trap.width * CELL_SIZE
+  const segment = segments.find((candidate) =>
+    trapLeft >= candidate.left - 0.5 && trapRight <= candidate.right + 0.5,
+  )
+  if (!segment) return { x: 0, y: 0, rotation: trap.rotation }
+
+  const minX = segment.left
+  const maxX = Math.max(minX, segment.right - trap.width * CELL_SIZE)
+  const span = maxX - minX
+  if (span <= 0) return { x: minX - trapLeft, y: 0, rotation: trap.rotation }
+
+  const phase = ((elapsed * HUNTER_GUARD_SPEED) % (span * 2) + span * 2) % (span * 2)
+  const forwardDistance = phase <= span ? phase : span * 2 - phase
+  const initialDirection = (stableTrapSeed(`${trap.instanceId}:${trap.placedRound}`) & 1) === 0 ? 1 : -1
+  const distance = initialDirection === 1 ? forwardDistance : span - forwardDistance
+  return {
+    x: minX + distance - trapLeft,
+    y: 0,
+    rotation: trap.rotation,
+  }
+}
+
+function trapMotion(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
   const movingHorizontal = new Set(['moveplatform1x1', 'moveplatform2x1', 'moveplatform3x1', 'trackplatform', 'onedirblock'])
   const movingVertical = new Set(['doublelift', 'stomper', 'crumblingblock'])
   const rotating = new Set(['swingplatform', 'spinningplatform', 'spikeball', 'rotaryhazard', 'squaredplatform', 'spinningsaw', 'swingsaw'])
   const phase = (trap.placedRound * 0.71 + trap.x * 0.13 + trap.y * 0.17) % (Math.PI * 2)
   const wave = Math.sin(elapsed * (Math.PI * 2 / 3.6) + phase)
   const saw = trap.trapId === 'linearsaw' ? linearSawMotion(trap, elapsed) : null
+  const hunter = trap.trapId === 'hunterguard' ? hunterGuardMotion(trap, elapsed, level) : null
   return {
-    offsetX: movingHorizontal.has(trap.trapId)
+    offsetX: hunter?.x ?? (movingHorizontal.has(trap.trapId)
       ? wave * 150
-      : 0,
-    offsetY: movingVertical.has(trap.trapId) ? Math.max(0, wave) * 150 : 0,
-    visualRotation: rotating.has(trap.trapId)
+      : 0),
+    offsetY: hunter?.y ?? (movingVertical.has(trap.trapId) ? Math.max(0, wave) * 150 : 0),
+    visualRotation: hunter?.rotation ?? (rotating.has(trap.trapId)
       ? trap.rotation + (trap.trapId === 'swingsaw' ? wave * 60 : wave * 25)
-      : trap.rotation,
+      : trap.rotation),
     movingOffsetX: saw?.x ?? 0,
     movingOffsetY: saw?.y ?? 0,
     movingRotation: saw?.rotation ?? trap.rotation,
   }
 }
 
-function trapWorldRect(trap: PlacedTrap, elapsed: number) {
-  const motion = trapMotion(trap, elapsed)
+function trapWorldRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const motion = trapMotion(trap, elapsed, level)
   return {
     x: trap.x * CELL_SIZE + motion.offsetX,
     y: trap.y * CELL_SIZE + motion.offsetY,
@@ -625,10 +681,11 @@ function rotatedCells(definition: TrapDefinition, rotation: Rotation): TrapCell[
 function trapCellRects(
   trap: Pick<PlacedTrap, 'trapId' | 'x' | 'y' | 'rotation'>,
   elapsed: number,
+  level: LevelSnapshot = LEVEL_BASE,
 ) {
   const definition = trapDefinition(trap.trapId)
   if (!definition) return []
-  const motion = trapMotion(trap as PlacedTrap, elapsed)
+  const motion = trapMotion(trap as PlacedTrap, elapsed, level)
   return rotatedCells(definition, trap.rotation).map((cell) => ({
     x: trap.x * CELL_SIZE + cell.x * CELL_SIZE + motion.offsetX,
     y: trap.y * CELL_SIZE + cell.y * CELL_SIZE + motion.offsetY,
@@ -644,8 +701,8 @@ function trapCellRects(
  * footprint is already rotated before it reaches the server, so its world
  * bounds are the exact collider bounds for the placed component.
  */
-function springPlatformRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
-  const motion = trapMotion(trap, elapsed)
+function springPlatformRects(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect[] {
+  const motion = trapMotion(trap, elapsed, level)
   return [{
     x: trap.x * CELL_SIZE + motion.offsetX,
     y: trap.y * CELL_SIZE + motion.offsetY,
@@ -654,8 +711,8 @@ function springPlatformRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
   }]
 }
 
-function trapOccupiedBounds(trap: PlacedTrap, elapsed: number) {
-  const cells = trapCellRects(trap, elapsed)
+function trapOccupiedBounds(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const cells = trapCellRects(trap, elapsed, level)
   if (cells.length === 0) return null
   const left = Math.min(...cells.map((cell) => cell.x))
   const top = Math.min(...cells.map((cell) => cell.y))
@@ -671,26 +728,27 @@ type TrapRect = { x: number; y: number; width: number; height: number }
  * component. Damage/trigger rectangles are resolved separately below, so a
  * trap can both block the character and still apply its effect.
  */
-function trapBodyRects(trap: PlacedTrap, elapsed: number): TrapRect[] {
+function trapBodyRects(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect[] {
   const definition = trapDefinition(trap.trapId)
   const isLeagueTrap = (PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trap.trapId)
   if (!isLeagueTrap || !definition || definition.collisionMode === 'none') return []
+  if (trap.trapId === 'hunterguard') return []
   return trap.trapId === 'spring'
-    ? springPlatformRects(trap, elapsed)
-    : trapCellRects(trap, elapsed)
+    ? springPlatformRects(trap, elapsed, level)
+    : trapCellRects(trap, elapsed, level)
 }
 
-function trapEntityCenter(trap: PlacedTrap, elapsed: number) {
-  const motion = trapMotion(trap, elapsed)
+function trapEntityCenter(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const motion = trapMotion(trap, elapsed, level)
   return {
     x: trap.x * CELL_SIZE + (trap.width * CELL_SIZE) / 2 + motion.offsetX,
     y: trap.y * CELL_SIZE + (trap.height * CELL_SIZE) / 2 + motion.offsetY,
   }
 }
 
-function linearSawWorldCenter(trap: PlacedTrap, elapsed: number) {
-  const center = trapEntityCenter(trap, elapsed)
-  const motion = trapMotion(trap, elapsed)
+function linearSawWorldCenter(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const center = trapEntityCenter(trap, elapsed, level)
+  const motion = trapMotion(trap, elapsed, level)
   return {
     x: center.x + motion.movingOffsetX,
     y: center.y + motion.movingOffsetY,
@@ -727,13 +785,13 @@ function orientedRect(
   }
 }
 
-function fortuneCatTriggerRect(trap: PlacedTrap, elapsed: number) {
-  const center = trapEntityCenter(trap, elapsed)
+function fortuneCatTriggerRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const center = trapEntityCenter(trap, elapsed, level)
   return orientedRect(center.x, center.y, 2.6 * CELL_SIZE, 0.8 * CELL_SIZE, 0, 0, trap.rotation)
 }
 
-function fortuneCatHazardRect(trap: PlacedTrap, elapsed: number) {
-  const center = trapEntityCenter(trap, elapsed)
+function fortuneCatHazardRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
+  const center = trapEntityCenter(trap, elapsed, level)
   // Ov's source code uses `0.2 * gridHeight` for the hazard offset. The
   // component is two cells tall, so this is 20px / 0.4 authored cell.
   const componentHeight = (trapDefinition('fortunecat')?.height ?? 2) * CELL_SIZE
@@ -765,10 +823,10 @@ function cactusProgress(age: number) {
   return bounceIn((2.1 - age) / 0.5)
 }
 
-function cactusHazardRect(trap: PlacedTrap, elapsed: number, age: number) {
+function cactusHazardRect(trap: PlacedTrap, elapsed: number, age: number, level: LevelSnapshot = LEVEL_BASE) {
   const progress = cactusProgress(age)
   if (progress <= 0.5) return null
-  const center = trapEntityCenter(trap, elapsed)
+  const center = trapEntityCenter(trap, elapsed, level)
   const epsilon = 0.001
   return orientedRect(
     center.x,
@@ -781,10 +839,10 @@ function cactusHazardRect(trap: PlacedTrap, elapsed: number, age: number) {
   )
 }
 
-function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
+function trapTriggerRects(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
   const definition = trapDefinition(trap.trapId)
   if (!definition) return []
-  const cells = trapCellRects(trap, elapsed)
+  const cells = trapCellRects(trap, elapsed, level)
   const rects = cells.map((cell) => {
     const x = cell.x
     const y = cell.y
@@ -835,8 +893,8 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number) {
   return rects
 }
 
-function springSpikesHazardRect(trap: PlacedTrap, elapsed: number): TrapRect | null {
-  const bounds = trapOccupiedBounds(trap, elapsed)
+function springSpikesHazardRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect | null {
+  const bounds = trapOccupiedBounds(trap, elapsed, level)
   if (!bounds) return null
   const inset = 5
   const thickness = CELL_SIZE * 0.4
@@ -1266,7 +1324,7 @@ export class GameSimulation {
         decorations: this.level.decorations.map((decoration) => ({ ...decoration })),
         traps: this.placedTraps.map((trap) => ({
           ...trap,
-          ...trapMotion(trap, this.elapsed),
+          ...trapMotion(trap, this.elapsed, this.level),
           active: this.isTrapHazardActive(trap),
           phase: this.trapPhase(trap),
         })),
@@ -1285,8 +1343,8 @@ export class GameSimulation {
     if (player.onGround && player.supportId) {
       const support = this.placedTraps.find((trap) => trap.instanceId === player.supportId)
       if (support) {
-        const currentMotion = trapMotion(support, this.elapsed)
-        const previousMotion = trapMotion(support, Math.max(0, this.elapsed - dt))
+        const currentMotion = trapMotion(support, this.elapsed, this.level)
+        const previousMotion = trapMotion(support, Math.max(0, this.elapsed - dt), this.level)
         player.x += currentMotion.offsetX - previousMotion.offsetX
         player.y += currentMotion.offsetY - previousMotion.offsetY
       }
@@ -1434,7 +1492,7 @@ export class GameSimulation {
       // trigger/hazard effect is checked separately after movement.
       const isSurface = definition.collisionMode !== 'none'
       if (!isSurface) return []
-      const rects = trapBodyRects(trap, this.elapsed)
+      const rects = trapBodyRects(trap, this.elapsed, this.level)
       return rects.map((rect, index) => ({
         id: `trap-surface-${trap.instanceId}-${index}`,
         x: rect.x,
@@ -1543,7 +1601,7 @@ export class GameSimulation {
       // collision face, so body overlap must not trigger them a second time.
       if (trap.trapId === 'spring') continue
       if (trap.trapId === 'spikeball') {
-        const center = trapEntityCenter(trap, this.elapsed)
+        const center = trapEntityCenter(trap, this.elapsed, this.level)
         const spikeballBounds = {
           x: center.x - 17.5,
           y: center.y - 17.5,
@@ -1565,7 +1623,7 @@ export class GameSimulation {
         continue
       }
       if (trap.trapId === 'linearsaw') {
-        const center = linearSawWorldCenter(trap, this.elapsed)
+        const center = linearSawWorldCenter(trap, this.elapsed, this.level)
         const sawBounds = {
           x: center.x - PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius,
           y: center.y - PDZZ_PHYSICS.componentMechanics.linearSaw.bladeRadius,
@@ -1619,7 +1677,7 @@ export class GameSimulation {
         }
       }
       if (definition.effect === 'wind') {
-        const fan = trapWorldRect(trap, this.elapsed)
+        const fan = trapWorldRect(trap, this.elapsed, this.level)
         const range = PDZZ_PHYSICS.playerDerived.fanRangePixels
         const inRange = trap.rotation === 90
           ? overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, fan.x + CELL_SIZE, fan.y, range, CELL_SIZE)
@@ -1774,7 +1832,7 @@ export class GameSimulation {
       // a second cell-sized wall pass after the spring impulse would erase
       // the side-launch position and velocity.
       if (trap.trapId === 'linearsaw' || trap.trapId === 'spring') continue
-      for (const rect of trapBodyRects(trap, this.elapsed)) {
+      for (const rect of trapBodyRects(trap, this.elapsed, this.level)) {
         const trapX = rect.x
         const trapWidth = rect.width
         if (!overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, trapX, rect.y, trapWidth, rect.height)) continue
@@ -1870,7 +1928,7 @@ export class GameSimulation {
       default:
         player.y = Math.min(
           player.y,
-          (contactedRect?.y ?? springPlatformRects(trap, this.elapsed)[0]?.y ?? trapWorldRect(trap, this.elapsed).y) - PLAYER_HEIGHT,
+          (contactedRect?.y ?? springPlatformRects(trap, this.elapsed, this.level)[0]?.y ?? trapWorldRect(trap, this.elapsed, this.level).y) - PLAYER_HEIGHT,
         )
         player.velocityY = springVelocity
         player.springJump = true
@@ -1882,7 +1940,7 @@ export class GameSimulation {
   }
 
   private applyTrapEffect(player: SimPlayer, trap: PlacedTrap, effect: TrapEffect) {
-    const rect = trapWorldRect(trap, this.elapsed)
+    const rect = trapWorldRect(trap, this.elapsed, this.level)
     const trapY = rect.y
     const cooldownUntil = player.trapCooldowns.get(trap.instanceId) ?? 0
     if (cooldownUntil > this.elapsed && effect !== 'ice' && effect !== 'slow') return
@@ -1917,7 +1975,7 @@ export class GameSimulation {
             candidate.trapId === 'portal' && candidate.instanceId !== trap.instanceId,
           )
           if (target) {
-            const targetRect = trapWorldRect(target, this.elapsed)
+            const targetRect = trapWorldRect(target, this.elapsed, this.level)
             player.x = targetRect.x + targetRect.width / 2 - PLAYER_WIDTH / 2
             player.y = targetRect.y + targetRect.height / 2 - PLAYER_HEIGHT / 2
           } else {
@@ -1970,7 +2028,7 @@ export class GameSimulation {
   private updateSwitches() {
     for (const trap of this.placedTraps) {
       if (trap.trapId !== 'onoffswitch' && trap.trapId !== 'pressureswitch') continue
-      const rects = trapCellRects(trap, this.elapsed)
+      const rects = trapCellRects(trap, this.elapsed, this.level)
       const occupiedByPlayer = Array.from(this.players.values()).some((player) =>
         player.alive && rects.some((rect) => overlaps(
           player.x,
@@ -1986,7 +2044,7 @@ export class GameSimulation {
       const occupiedByObject = this.placedTraps.some((object) =>
         object.instanceId !== trap.instanceId &&
         ['pushableplatform', 'bomb', 'bombsmall', 'superblock'].includes(object.trapId) &&
-        trapCellRects(object, this.elapsed).some((objectRect) => rects.some((rect) =>
+        trapCellRects(object, this.elapsed, this.level).some((objectRect) => rects.some((rect) =>
           overlaps(objectRect.x, objectRect.y, objectRect.width, objectRect.height, rect.x, rect.y, rect.width, rect.height),
         )),
       )
@@ -2018,19 +2076,19 @@ export class GameSimulation {
 
   private trapHazardRects(trap: PlacedTrap): TrapRect[] {
     if (trap.trapId === 'fortunecat') {
-      return [fortuneCatHazardRect(trap, this.elapsed), ...trapBodyRects(trap, this.elapsed)]
+      return [fortuneCatHazardRect(trap, this.elapsed, this.level), ...trapBodyRects(trap, this.elapsed, this.level)]
     }
     if (trap.trapId === 'triggerhazard') {
       const started = this.trapActivationAt.get(trap.instanceId)
       if (started === undefined) return []
-      const rect = cactusHazardRect(trap, this.elapsed, this.elapsed - started)
-      return rect ? [rect, ...trapBodyRects(trap, this.elapsed)] : []
+      const rect = cactusHazardRect(trap, this.elapsed, this.elapsed - started, this.level)
+      return rect ? [rect, ...trapBodyRects(trap, this.elapsed, this.level)] : []
     }
     if (trap.trapId === 'triggerspikes') {
-      const rect = springSpikesHazardRect(trap, this.elapsed)
-      return rect ? [rect, ...trapBodyRects(trap, this.elapsed)] : []
+      const rect = springSpikesHazardRect(trap, this.elapsed, this.level)
+      return rect ? [rect, ...trapBodyRects(trap, this.elapsed, this.level)] : []
     }
-    return trapTriggerRects(trap, this.elapsed)
+    return trapTriggerRects(trap, this.elapsed, this.level)
   }
 
   private trapPhase(trap: PlacedTrap): PlacedTrap['phase'] {
@@ -2060,7 +2118,7 @@ export class GameSimulation {
         if (this.elapsed - started >= lifetime) this.trapActivationAt.delete(trap.instanceId)
         continue
       }
-      const cells = trapCellRects(trap, this.elapsed)
+      const cells = trapCellRects(trap, this.elapsed, this.level)
       const cell = cells[0]
       if (!cell) continue
       let shouldActivate = false
@@ -2107,9 +2165,9 @@ export class GameSimulation {
         }
         if (trap.trapId === 'triggerspikes') {
           // The APK triggers spring spikes from the matching collision face.
-          const bounds = trapOccupiedBounds(trap, this.elapsed)
+          const bounds = trapOccupiedBounds(trap, this.elapsed, this.level)
           if (!bounds) continue
-          const spikeFace = springSpikesHazardRect(trap, this.elapsed)
+          const spikeFace = springSpikesHazardRect(trap, this.elapsed, this.level)
           inside = Boolean(spikeFace && sweptPlayerOverlapsRect(
             previousPositions.get(player.id)?.x ?? player.x,
             previousPositions.get(player.id)?.y ?? player.y,
@@ -2134,12 +2192,12 @@ export class GameSimulation {
       if (!player.alive || player.finished) continue
       const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
       const nextIce = this.placedTraps.some((trap) =>
-        trap.trapId === 'ice' && trapTriggerRects(trap, this.elapsed).some((rect) =>
+        trap.trapId === 'ice' && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         ),
       )
       const nextMud = this.placedTraps.some((trap) =>
-        trap.trapId === 'mud' && trapTriggerRects(trap, this.elapsed).some((rect) =>
+        trap.trapId === 'mud' && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         ),
       )
@@ -2156,7 +2214,7 @@ export class GameSimulation {
     return this.placedTraps.some((trap) => {
       // pv/_v only report grounded material when the component faces up.
       if (trap.trapId !== trapId || trap.rotation !== 0) return false
-      return trapTriggerRects(trap, this.elapsed).some((rect) =>
+      return trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
         overlaps(
           player.x + 4,
           player.y + PLAYER_HEIGHT - 4,
@@ -2180,7 +2238,7 @@ export class GameSimulation {
 
     for (const trap of this.placedTraps) {
       if (trap.trapId !== 'gas') continue
-      const motion = trapMotion(trap, this.elapsed)
+      const motion = trapMotion(trap, this.elapsed, this.level)
       // zy creates child colliders from the component origin. The extracted
       // APK uses local offsets (-1,-1) for the 2x2 outer box and
       // (-0.75,-0.75) for the 1.5x1.5 inner box; these are not centered from
@@ -2265,7 +2323,7 @@ export class GameSimulation {
       if (!settings || this.isTrapDisabled(trap)) continue
       const nextFire = this.switchCooldowns.get(`projectile:${trap.instanceId}`) ?? PHYSICS.componentMechanics.cannon.startCooldownSeconds
       if (this.elapsed < nextFire) continue
-      const rect = trapWorldRect(trap, this.elapsed)
+      const rect = trapWorldRect(trap, this.elapsed, this.level)
       const angle = (trap.rotation * Math.PI) / 180 - Math.PI / 2
       this.projectiles.push({
         id: `${trap.instanceId}:${this.elapsed.toFixed(3)}`,

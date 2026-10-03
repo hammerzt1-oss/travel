@@ -98,6 +98,9 @@ export const PDZZ_PHYSICS = {
       "easing": "sineInOut",
       "spinDegreesPerSecond": 500,
       "bladeRadius": 20
+    },
+    "hunterGuard": {
+      "speed": 90
     }
   }
 } as const
@@ -26874,6 +26877,47 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "maxCountInLevel": 0
   },
   {
+    "id": "hunterguard",
+    "name": "猎杀兵",
+    "description": "hazard · 在所在水平地面段内随机方向巡逻，接触即淘汰",
+    "width": 1,
+    "height": 1,
+    "viewWidth": 1,
+    "viewHeight": 1,
+    "cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "glyph": "!",
+    "color": "#2ab8dc",
+    "placement": "supported",
+    "effect": "kill",
+    "collisionMode": "trigger",
+    "category": "hazard",
+    "sourceType": "hazard",
+    "componentType": 3,
+    "defaultDir": 1,
+    "rotateMode": 1,
+    "snapToGround": true,
+    "fullrect": true,
+    "danToUnlock": 8,
+    "isVip": false,
+    "available": true,
+    "iconSource": "component",
+    "iconFrame": "hunterguard.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/hunterguard.png",
+    "iconCrop": {
+      "x": 0,
+      "y": 0,
+      "width": 2048,
+      "height": 2048
+    },
+    "iconConfidence": "alias",
+    "maxCountInLevel": 0
+  },
+  {
     "id": "platformsaw",
     "name": "圆锯平台",
     "description": "hazard · 来自 APK 组件配置",
@@ -29182,12 +29226,12 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'spike',
   'spring',
   'spikeball',
-  'linearsaw',
+  'hunterguard',
 ] as const
 
-/** Only the two ordinary ground-spike options require a platform underneath. */
+/** Ground hazards and the patrol enemy must be placed on a platform top. */
 export function pdzzTrapRequiresGroundSupport(trapId: string) {
-  return trapId === 'spike' || trapId === 'spike3x1'
+  return trapId === 'spike' || trapId === 'spike3x1' || trapId === 'hunterguard'
 }
 
 export type PdzzLeagueComponentGuide = {
@@ -29238,9 +29282,9 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
     configuration: '1×1 格；自由朝向；圆形伤害碰撞半径为 17.5 px（50×0.5×0.7）。',
   },
   {
-    id: 'linearsaw',
-    functionText: '站在锯台上会被往返移动的锯片切中，锯片接触动物立即淘汰。',
-    configuration: '5×1 格平台；显示区域 5×2 格；底座为平台碰撞体，锯片为半径 20 px 的独立圆形伤害体；锯片沿 200 px 路径以 100 px/s 使用 sineInOut 往返，并以 500°/s 自转；旋转方向时平台与锯片按原作四向局部坐标重置。',
+    id: 'hunterguard',
+    functionText: '放在地面后自动识别这一行连续的水平地面段，在段内随机方向巡逻，碰到动物立即淘汰。',
+    configuration: '1×1 格；必须贴在平台顶面；只合并同一高度且相接的水平平台；巡逻边界为该连续地面段的左右端点，不跨越断点；速度 90 px/s，实例使用稳定随机初始方向，触碰框为移动中的 1×1 格。',
   },
 ]
 

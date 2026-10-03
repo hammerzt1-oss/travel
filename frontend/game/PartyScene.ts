@@ -768,8 +768,8 @@ export class PartyScene extends Phaser.Scene {
       phase,
       trap.rotation,
       trap.trapId === 'linearsaw' ? trap.rotation : (trap.visualRotation ?? trap.rotation),
-      trap.offsetX ?? 0,
-      trap.offsetY ?? 0,
+      trap.trapId === 'hunterguard' ? 0 : (trap.offsetX ?? 0),
+      trap.trapId === 'hunterguard' ? 0 : (trap.offsetY ?? 0),
       animationStep,
       cactusAnimationStep,
       gasFrame,
@@ -820,6 +820,16 @@ export class PartyScene extends Phaser.Scene {
       const position = this.linearSawLocalPosition(trap)
       this.addGameImage(container, 'linearsawstand.png', position.x, position.y, 1, 0.5, 0.1)?.setAngle(trap.rotation)
       this.addGameImage(container, 'saw.png', position.x, position.y)?.setAngle(position.rotation)
+      return
+    }
+
+    if (trap.trapId === 'hunterguard') {
+      // The source image is a standalone 2048px PNG; the runtime entity is
+      // exactly one authored cell with its feet on the ground baseline.
+      const texture = this.componentTexture(component)
+      if (!texture) return
+      const guard = this.addTextureImage(container, texture, 0, 0, 1, 0.5, 1)
+      guard?.setDisplaySize(cell, cell)
       return
     }
 

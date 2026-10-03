@@ -126,6 +126,7 @@ function predictedPlatforms(state: GameState): Platform[] {
     if (
       !definition ||
       definition.collisionMode === 'none' ||
+      trap.trapId === 'hunterguard' ||
       !(PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trap.trapId)
     ) return []
     const offsetX = trap.offsetX ?? 0

@@ -26,6 +26,8 @@ assert.equal(isLegalTrapPlacement('mud', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('spike', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('linearsaw', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('linearsaw', 2, 7, 90, []), true)
+assert.equal(isLegalTrapPlacement('hunterguard', 2, 11, 0, []), true)
+assert.equal(isLegalTrapPlacement('hunterguard', 2, 10, 0, []), false)
 
 assert.ok(TRAP_DEFINITIONS.length >= 95)
 assert.ok(TRAP_DEFINITIONS.some((definition) => definition.id === 'cannon'))
@@ -312,6 +314,53 @@ linearSawHitPlayer.velocityY = 0
 linearSawHitSimulation.tick(1 / 60)
 assert.equal(linearSawHitPlayer.alive, false)
 
+// The hunter guard is a 1x1 moving hazard. It resolves the complete
+// same-height platform run containing its placement, but never crosses a
+// horizontal gap into another run.
+const hunterGuard: PlacedTrap = {
+  instanceId: 'hunterguard-gap-test',
+  trapId: 'hunterguard',
+  ownerId: 'p1',
+  x: 20,
+  y: 11,
+  width: 1,
+  height: 1,
+  rotation: 0,
+  placedRound: 1,
+}
+const hunterGuardSimulation = new GameSimulation(
+  1,
+  [{ id: 'hunterguard-motion', slot: 1, label: 'Player 1', score: 0 }],
+  [hunterGuard],
+)
+const hunterGuardPlayer = hunterGuardSimulation.players.get('hunterguard-motion')
+assert.ok(hunterGuardPlayer)
+let hunterGuardSnapshot = hunterGuardSimulation.snapshot('PLAYING').level.traps[0]
+let hunterGuardWorldX = hunterGuardSnapshot.x * 50 + (hunterGuardSnapshot.offsetX ?? 0)
+assert.ok(hunterGuardWorldX >= 1000)
+assert.ok(hunterGuardWorldX <= 1400)
+for (let index = 0; index < 600; index += 1) hunterGuardSimulation.tick(1 / 60)
+hunterGuardSnapshot = hunterGuardSimulation.snapshot('PLAYING').level.traps[0]
+hunterGuardWorldX = hunterGuardSnapshot.x * 50 + (hunterGuardSnapshot.offsetX ?? 0)
+assert.ok(hunterGuardWorldX >= 1000)
+assert.ok(hunterGuardWorldX <= 1400)
+
+// A player intersecting the moving 1x1 guard is killed by the guard itself,
+// while the guard remains non-solid and therefore is not a platform.
+const hunterGuardHitSimulation = new GameSimulation(
+  1,
+  [{ id: 'hunterguard-hit', slot: 1, label: 'Player 1', score: 0 }],
+  [{ ...hunterGuard, instanceId: 'hunterguard-hit-trap', x: 2 }],
+)
+const hunterGuardHitPlayer = hunterGuardHitSimulation.players.get('hunterguard-hit')
+assert.ok(hunterGuardHitPlayer)
+hunterGuardSnapshot = hunterGuardHitSimulation.snapshot('PLAYING').level.traps[0]
+hunterGuardHitPlayer.x = hunterGuardSnapshot.x * 50 + (hunterGuardSnapshot.offsetX ?? 0)
+hunterGuardHitPlayer.y = 540
+hunterGuardHitPlayer.onGround = false
+hunterGuardHitSimulation.tick(1 / 60)
+assert.equal(hunterGuardHitPlayer.alive, false)
+
 // Network packets can arrive after a newer input packet has already been
 // applied. The authoritative controller must keep the newest sequence and
 // expose it in snapshots so the client never reconciles against old input.
@@ -569,10 +618,14 @@ for (const trapId of PDZZ_LEAGUE_COMPONENT_IDS) {
   bodyPlayer.x = 150
   bodyPlayer.y = 540
   bodyPlayer.onGround = true
-  bodySimulation.setInput(`body-${trapId}`, { left: false, right: true, jump: false })
-  for (let index = 0; index < 30 && bodyPlayer.alive; index += 1) bodySimulation.tick(1 / 60)
-  assert.ok(bodyPlayer.x <= 170.1, `${trapId} allowed the player inside its body`)
-}
+   bodySimulation.setInput(`body-${trapId}`, { left: false, right: true, jump: false })
+   for (let index = 0; index < 30 && bodyPlayer.alive; index += 1) bodySimulation.tick(1 / 60)
+   if (trapId === 'hunterguard') {
+     assert.equal(bodyPlayer.alive, false, 'hunterguard should kill on contact')
+   } else {
+     assert.ok(bodyPlayer.x <= 170.1, `${trapId} allowed the player inside its body`)
+   }
+ }
 
 const groundSpikeCollisionSimulation = new GameSimulation(
   1,
