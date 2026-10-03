@@ -29,6 +29,7 @@ type SessionInfo = Extract<ServerMessage, { type: 'session' }>
 // Keep local development configurable, but never let a production build fall
 // back to the user's own device. On phones, localhost is the phone itself.
 const SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'https://travel-backend-afnq.onrender.com'
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0000000'
 const PDZZ_VIEWPORT_WIDTH = 750
 // The league recording is a 1220x2712 capture, i.e. a 750x1670 logical
 // viewport. The haystack level itself is authored at 2150x1700, so using
@@ -794,6 +795,7 @@ export default function PartyGame() {
       {screen === 'home' && (
         <section className="home-screen">
           <div className="home-copy">
+            <p className="app-version">当前版本：v={APP_VERSION}</p>
             <p className="eyebrow">LEAGUE SINGLE OR PARTY RUN</p>
             <h1>跳跳搭档</h1>
             <p className="home-tagline">选择机关、摆到地图里，五局比赛决定胜负。</p>
