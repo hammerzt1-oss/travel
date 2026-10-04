@@ -6,7 +6,7 @@ import {
   TRAP_DEFINITIONS,
 } from './simulation'
 import type { PlacedTrap } from '../../shared/gameProtocol'
-import { PDZZ_LEAGUE_COMPONENT_IDS } from '../../shared/pdzzConfig'
+import { pdzzTrapCollisionRects } from '../../shared/pdzzConfig'
 
 const supportedIce: PlacedTrap = {
   instanceId: 'ice-1',
@@ -31,6 +31,15 @@ assert.equal(isLegalTrapPlacement('hunterguard', 2, 10, 0, []), false)
 
 assert.ok(TRAP_DEFINITIONS.length >= 95)
 assert.ok(TRAP_DEFINITIONS.some((definition) => definition.id === 'cannon'))
+
+// Effect-only components have trigger volumes but no physical wall. Physical
+// league bodies use the authored sprite/platform dimensions instead of a full
+// editor cell.
+assert.deepEqual(pdzzTrapCollisionRects('gas', 0), [])
+assert.deepEqual(pdzzTrapCollisionRects('gravityflip', 0), [])
+assert.deepEqual(pdzzTrapCollisionRects('flashblind', 0), [])
+assert.deepEqual(pdzzTrapCollisionRects('linearsaw', 0), [{ x: 0, y: 1, width: 250, height: 49 }])
+assert.deepEqual(pdzzTrapCollisionRects('triggerspikes', 0), [{ x: 0, y: 14, width: 200, height: 36 }])
 
 // These are the authored League single-player haystack coordinates. They are
 // deliberately asserted against the runtime level, not only the imported
@@ -520,8 +529,8 @@ sweptSpikePlayer.y = 540
 sweptSpikePlayer.velocityX = 250
 sweptSpikeSimulation.setInput('swept-spike-player', { left: false, right: true, jump: false }, 1)
 sweptSpikeSimulation.tick(1)
-assert.equal(sweptSpikePlayer.alive, true)
-assert.ok(sweptSpikePlayer.x <= 170.1)
+assert.equal(sweptSpikePlayer.alive, false)
+assert.equal(sweptSpikeSimulation.snapshot('PLAYING').players[0].deathTrapId, 'spike')
 
 const cat: PlacedTrap = {
   instanceId: 'cat-1',
@@ -582,83 +591,25 @@ assert.ok(gasPlayer.reverseUntil > gasSimulation.snapshot('PLAYING').phaseEndsAt
 for (let index = 0; index < 125; index += 1) gasSimulation.tick(1 / 60)
 assert.equal(gasPlayer.reverseUntil, 0)
 
-// Trigger-only league components still occupy a physical body. The player
-// must stop at the gas cell instead of walking through its sprite.
-const gasWallSimulation = new GameSimulation(
-  1,
-  [{ id: 'gas-wall-player', slot: 1, label: 'Player 1', score: 0 }],
-  [{ ...gas, instanceId: 'gas-wall', x: 4, y: 8 }],
-)
-const gasWallPlayer = gasWallSimulation.players.get('gas-wall-player')
-assert.ok(gasWallPlayer)
-gasWallPlayer.x = 150
-gasWallPlayer.y = 390
-gasWallPlayer.onGround = false
-gasWallSimulation.setInput('gas-wall-player', { left: false, right: true, jump: false })
-for (let index = 0; index < 60; index += 1) gasWallSimulation.tick(1 / 60)
-assert.ok(gasWallPlayer.x <= 170.1)
-
-// Every league option gets the same occupied-cell body. It must also hold for
-// the two ground-spike options: the exposed spike strip is a damage trigger,
-// while the occupied cell is still a solid obstacle for the character.
-for (const trapId of PDZZ_LEAGUE_COMPONENT_IDS) {
+// Trigger-only league components are crossed by the character; their effect
+// boxes remain authoritative and are tested below. No full editor-cell wall
+// is allowed to mask gas, spikes, cactus, gravity or flashblind triggers.
+for (const trapId of ['gas', 'spike', 'spike3x1', 'spikeball', 'triggerhazard', 'gravityflip', 'flashblind']) {
   const definition = TRAP_DEFINITIONS.find((item) => item.id === trapId)
   assert.ok(definition)
-  const bodySimulation = new GameSimulation(
-    1,
-    [{ id: `body-${trapId}`, slot: 1, label: 'Player 1', score: 0 }],
-    [{
-      instanceId: `body-${trapId}`,
-      trapId,
-      ownerId: 'p1',
-      x: 4,
-      y: 10,
-      width: definition.width,
-      height: definition.height,
-      rotation: 0,
-      placedRound: 1,
-    }],
-  )
-  const bodyPlayer = bodySimulation.players.get(`body-${trapId}`)
-  assert.ok(bodyPlayer)
-  bodyPlayer.x = 150
-  bodyPlayer.y = 540
-  bodyPlayer.onGround = true
-   bodySimulation.setInput(`body-${trapId}`, { left: false, right: true, jump: false })
-   for (let index = 0; index < 30 && bodyPlayer.alive; index += 1) bodySimulation.tick(1 / 60)
-   if (trapId === 'hunterguard') {
-     assert.equal(bodyPlayer.alive, false, 'hunterguard should kill on contact')
-   } else {
-     assert.ok(bodyPlayer.x <= 170.1, `${trapId} allowed the player inside its body`)
-   }
- }
-
-const groundSpikeCollisionSimulation = new GameSimulation(
-  1,
-  [{ id: 'ground-spike-wall-player', slot: 1, label: 'Player 1', score: 0 }],
-  [{
-    instanceId: 'ground-spike-wall',
-    trapId: 'spike',
-    ownerId: 'p1',
-    x: 4,
-    y: 11,
-    width: 1,
-    height: 1,
-    rotation: 0,
-    placedRound: 1,
-  }],
-)
-const groundSpikeWallPlayer = groundSpikeCollisionSimulation.players.get('ground-spike-wall-player')
-assert.ok(groundSpikeWallPlayer)
-groundSpikeWallPlayer.x = 150
-groundSpikeWallPlayer.y = 540
-groundSpikeWallPlayer.onGround = true
-groundSpikeCollisionSimulation.setInput('ground-spike-wall-player', { left: false, right: true, jump: false })
-for (let index = 0; index < 60 && groundSpikeWallPlayer.alive; index += 1) {
-  groundSpikeCollisionSimulation.tick(1 / 60)
+  assert.ok(definition.collisionMode === 'trigger' || definition.collisionMode === 'none')
+  assert.deepEqual(pdzzTrapCollisionRects(trapId, 0), [])
 }
-assert.ok(groundSpikeWallPlayer.alive)
-assert.ok(groundSpikeWallPlayer.x <= 170.1, 'ground spike allowed the player inside its blocking body')
+
+// Hybrid components still block, but only at their authored physical parts.
+for (const trapId of ['fortunecat', 'triggerspikes', 'linearsaw', 'guillotineaxe']) {
+  const definition = TRAP_DEFINITIONS.find((item) => item.id === trapId)
+  assert.ok(definition)
+  assert.ok(definition.collisionMode === 'hybrid')
+  assert.ok(pdzzTrapCollisionRects(trapId, 0).every((rect) =>
+    rect.width < definition.width * 50 || rect.height < definition.height * 50,
+  ))
+}
 
 // Jf is three native spike colliders. Touching the third cell is enough to
 // die, even though the bundle itself is represented by one placed option.

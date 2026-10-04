@@ -3,6 +3,103 @@ export type PdzzTrapEffect = 'kill' | 'ice' | 'bounce' | 'slow' | 'teleport' | '
 export type PdzzMapElement = {} & { id: string; index: number; position: { x: number; y: number }; angle: number; semanticKey: string; extension: { tag: string; sprite: string; spriteX: number; spriteY: number; scale: number; flipX: boolean; flipY: boolean; zOrder: number; alpha: number; isSliced: boolean; slicedWidth: number; slicedHeight: number }; collider: { shape: 'box' | 'circle'; width: number | null; height: number | null; radius: number | null; rotation: number; hazard: boolean; colliderType: number } | null }
 export type PdzzMapDefinition = { id: string; sourceId: string; name: string; available: boolean; supportTeamBattle: boolean; supportAIBattle: boolean; noFlag?: boolean; minX: number; minY: number; width: number; height: number; editMinX?: number; editMinY?: number; editWidth?: number; editHeight?: number; spawnX: number; spawnY: number; finishX: number; finishY: number; secondarySpawnPoints?: Array<{ x: number; y: number }>; secondaryFinishPoints?: Array<{ x: number; y: number }>; backgroundAsset: string | null; thumbnailAsset: string | null; atlasAsset: string | null; atlasImageAsset: string | null; skySprite: string | null; spriteAssets: Record<string, string>; elements: PdzzMapElement[] }
 export type PdzzComponentDefinition = { id: string; name: string; description: string; width: number; height: number; viewWidth: number; viewHeight: number; cells: number[][]; glyph: string; color: string; placement: 'free' | 'supported'; effect: PdzzTrapEffect; collisionMode: 'solid' | 'trigger' | 'hybrid' | 'none'; category: string; sourceType: string; componentType: number; defaultDir: number; rotateMode: number; snapToGround: boolean; fullrect: boolean; danToUnlock: number; isVip: boolean; available: boolean; iconSource: 'game' | 'component' | null; iconFrame: string | null; iconAsset: string | null; iconCrop: { x: number; y: number; width: number; height: number } | null; iconConfidence: 'exact' | 'alias' | 'missing' | 'generated'; maxCountInLevel: number }
+
+export type PdzzTrapCollisionRect = { x: number; y: number; width: number; height: number }
+
+/**
+ * Physical bodies for the league components are authored in pixels, not as
+ * editor-cell rectangles. Trigger-only components intentionally return no
+ * body here; their effect-specific trigger geometry lives in the simulation.
+ * The same table is used by the server and local prediction.
+ */
+const PDZZ_TRAP_BODY_SHAPES: Record<string, {
+  width: number
+  height: number
+  rects: PdzzTrapCollisionRect[]
+}> = {
+  spring: {
+    width: 2,
+    height: 1,
+    rects: [{ x: 0, y: 0, width: 100, height: 50 }],
+  },
+  fortunecat: {
+    width: 1,
+    height: 2,
+    // The cat body is narrower than the 1x2 editor footprint. Its raised claw
+    // is a separate hazard rectangle in the simulation.
+    rects: [{ x: 8, y: 5, width: 34, height: 86 }],
+  },
+  triggerspikes: {
+    width: 4,
+    height: 1,
+    // The platform strip in triggerspikes_platform.png is 212x36; keep the
+    // authored four-cell width while preserving its 36px occupied height.
+    rects: [{ x: 0, y: 14, width: 200, height: 36 }],
+  },
+  linearsaw: {
+    width: 5,
+    height: 1,
+    rects: [{ x: 0, y: 1, width: 250, height: 49 }],
+  },
+  guillotineaxe: {
+    width: 5,
+    height: 2,
+    // The swinging blade is a hazard, while the lower base is the only
+    // physical support. The chain/blade area must remain passable until hit.
+    rects: [{ x: 0, y: 84, width: 250, height: 16 }],
+  },
+}
+
+function rotatePdzzTrapRect(
+  rect: PdzzTrapCollisionRect,
+  width: number,
+  height: number,
+  rotation: 0 | 90 | 180 | 270,
+  cellSize: number,
+): PdzzTrapCollisionRect {
+  const rectCenterX = rect.x + rect.width / 2
+  const rectCenterY = rect.y + rect.height / 2
+  let centerX = rectCenterX
+  let centerY = rectCenterY
+  let rectWidth = rect.width
+  let rectHeight = rect.height
+  const footprintWidth = width * cellSize
+  const footprintHeight = height * cellSize
+  switch (rotation) {
+    case 90:
+      centerX = footprintHeight - rectCenterY
+      centerY = rectCenterX
+      rectWidth = rect.height
+      rectHeight = rect.width
+      break
+    case 180:
+      centerX = footprintWidth - rectCenterX
+      centerY = footprintHeight - rectCenterY
+      break
+    case 270:
+      centerX = rectCenterY
+      centerY = footprintWidth - rectCenterX
+      rectWidth = rect.height
+      rectHeight = rect.width
+      break
+  }
+  return {
+    x: centerX - rectWidth / 2,
+    y: centerY - rectHeight / 2,
+    width: rectWidth,
+    height: rectHeight,
+  }
+}
+
+export function pdzzTrapCollisionRects(
+  trapId: string,
+  rotation: 0 | 90 | 180 | 270,
+  cellSize = 50,
+): PdzzTrapCollisionRect[] {
+  const shape = PDZZ_TRAP_BODY_SHAPES[trapId]
+  if (!shape) return []
+  return shape.rects.map((rect) => rotatePdzzTrapRect(rect, shape.width, shape.height, rotation, cellSize))
+}
 export type PdzzCharacterDefinition = { id: string; refID: string; name: string; description: string; avatarID: string; imageAsset: string | null; available: boolean }
 export const PDZZ_PHYSICS = {
   "fixedTimeStepMs": 17,
@@ -26946,7 +27043,7 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "color": "#22b9dc",
     "placement": "free",
     "effect": "wall",
-    "collisionMode": "hybrid",
+    "collisionMode": "none",
     "category": "gizmo",
     "sourceType": "gizmo",
     "componentType": 3,
@@ -26977,7 +27074,7 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "color": "#ffd34a",
     "placement": "free",
     "effect": "wall",
-    "collisionMode": "hybrid",
+    "collisionMode": "none",
     "category": "hazard",
     "sourceType": "hazard",
     "componentType": 6,
@@ -29365,7 +29462,7 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
   {
     id: 'gas',
     functionText: '进入内圈后反转左右操作；离开整片毒气后进入倒计时。',
-    configuration: '1×1 格；内圈 1.5×1.5 格，外圈 2×2 格；内圈进入事件只触发一次，离开外圈后反向状态再保持 2 秒，期间不会每帧重新眩晕。',
+    configuration: '1×1 格；无实体阻挡；内圈 1.5×1.5 格，外圈 2×2 格；内圈进入事件只触发一次，离开外圈后反向状态再保持 2 秒，期间不会每帧重新眩晕。',
   },
   {
     id: 'triggerhazard',
@@ -29400,7 +29497,7 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
   {
     id: 'linearsaw',
     functionText: '水平锯沿放置平台的方向往返移动，锯片碰到动物立即淘汰。',
-    configuration: '5×1 格；底座是完整平台碰撞体；锯片沿本体方向往返 200 px，速度 100 px/s，持续旋转；底座阻挡角色，移动锯片单独判定伤害。',
+    configuration: '5×1 格；底座实体为 250×49 px，不扩展为 5 个完整格子；锯片沿本体方向往返 200 px，速度 100 px/s，持续旋转；底座阻挡角色，移动锯片单独判定伤害。',
   },
   {
     id: 'hunterguard',
@@ -29410,12 +29507,12 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
   {
     id: 'gravityflip',
     functionText: '踩上翻转板后，角色重力朝屏幕上方，持续 1.2 秒，期间会被吸向上方。',
-    configuration: '2×2 格；混合碰撞体；进入占用区域只触发一次；重力方向翻转 1.2 秒，触发时脱离当前支撑面。',
+    configuration: '2×2 格；无实体阻挡；进入 2×2 触发区只触发一次；重力方向翻转 1.2 秒，触发时脱离当前支撑面。',
   },
   {
     id: 'flashblind',
     functionText: '玩家靠近时触发强光，屏幕短暂变白，看不清地图但不会受伤。',
-    configuration: '2×1 格；靠近范围 3×2 格；进入范围触发一次；致盲 2 秒；不改变速度、不造成伤害，离开后重新进入才可再次触发。',
+    configuration: '2×1 格；无实体阻挡；靠近范围 3×2 格；进入范围触发一次；致盲 2 秒；不改变速度、不造成伤害，离开后重新进入才可再次触发。',
   },
   {
     id: 'guillotineaxe',

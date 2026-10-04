@@ -20,6 +20,7 @@ import {
   PDZZ_PHYSICS,
   getPdzzCharacterForSlot,
   getPdzzMap,
+  pdzzTrapCollisionRects,
   pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 import { moveCharacter } from './pdzzCharacterController'
@@ -454,8 +455,7 @@ function buildAiPath(level: LevelSnapshot, traps: PlacedTrap[] = []) {
       const occupied = level.platforms.some((other) =>
         other.id !== platform.id && overlaps(body.x, body.y, body.width, body.height, other.x, other.y, other.width, other.height),
       ) || traps.some((trap) => {
-        const definition = trapDefinition(trap.trapId)
-        return definition?.collisionMode !== 'none' && trap.trapId !== 'hunterguard' && trapCellRects(trap, 0).some((rect) =>
+        return trapBodyRects(trap, 0, level).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         )
       })
@@ -725,7 +725,9 @@ function springPlatformRects(trap: PlacedTrap, elapsed: number, level: LevelSnap
 }
 
 function trapOccupiedBounds(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {
-  const cells = trapCellRects(trap, elapsed, level)
+  const cells = trap.trapId === 'triggerspikes'
+    ? trapBodyRects(trap, elapsed, level)
+    : trapCellRects(trap, elapsed, level)
   if (cells.length === 0) return null
   const left = Math.min(...cells.map((cell) => cell.x))
   const top = Math.min(...cells.map((cell) => cell.y))
@@ -737,18 +739,23 @@ function trapOccupiedBounds(trap: PlacedTrap, elapsed: number, level: LevelSnaps
 type TrapRect = { x: number; y: number; width: number; height: number }
 
 /**
- * The occupied-cell body is the physical obstacle of every placed league
- * component. Damage/trigger rectangles are resolved separately below, so a
- * trap can both block the character and still apply its effect.
+ * Return the authored physical body, separate from effect triggers. A trigger
+ * can occupy an editor cell without being a wall: gas, spikes, gravity and
+ * flashblind must be crossed so their own trigger boxes can fire.
  */
 function trapBodyRects(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect[] {
   const definition = trapDefinition(trap.trapId)
   const isLeagueTrap = (PDZZ_LEAGUE_COMPONENT_IDS as readonly string[]).includes(trap.trapId)
-  if (!isLeagueTrap || !definition || definition.collisionMode === 'none') return []
+  if (!isLeagueTrap || !definition || definition.collisionMode === 'none' || definition.collisionMode === 'trigger') return []
   if (trap.trapId === 'hunterguard') return []
-  return trap.trapId === 'spring'
-    ? springPlatformRects(trap, elapsed, level)
-    : trapCellRects(trap, elapsed, level)
+  if (trap.trapId === 'spring') return springPlatformRects(trap, elapsed, level)
+  const motion = trapMotion(trap, elapsed, level)
+  return pdzzTrapCollisionRects(trap.trapId, trap.rotation).map((rect) => ({
+    x: trap.x * CELL_SIZE + rect.x + motion.offsetX,
+    y: trap.y * CELL_SIZE + rect.y + motion.offsetY,
+    width: rect.width,
+    height: rect.height,
+  }))
 }
 
 function trapEntityCenter(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE) {

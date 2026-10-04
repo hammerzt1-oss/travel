@@ -1,4 +1,4 @@
-import { PDZZ_CHARACTERS, PDZZ_COMPONENTS, PDZZ_LEAGUE_COMPONENT_IDS, PDZZ_PHYSICS } from '../../shared/pdzzConfig'
+import { PDZZ_CHARACTERS, PDZZ_COMPONENTS, PDZZ_LEAGUE_COMPONENT_IDS, PDZZ_PHYSICS, pdzzTrapCollisionRects } from '../../shared/pdzzConfig'
 import type { GameState, PlayerInput, PlayerSnapshot, Platform, Rotation } from '../../shared/gameProtocol'
 import type { PartyScene } from './PartyScene'
 
@@ -95,25 +95,6 @@ const LOCAL_PREDICTION_MAX_DT_MS = 120
 const LOCAL_PLAYER_WIDTH = 30
 const LOCAL_PLAYER_HEIGHT = 60
 
-function rotatedTrapCells(
-  definition: (typeof PDZZ_COMPONENTS)[number],
-  rotation: Rotation,
-) {
-  const cells = definition.cells?.length ? definition.cells : [[0, 0]]
-  return cells.map(([x, y]) => {
-    switch (rotation) {
-      case 90:
-        return { x: definition.height - 1 - y, y: x }
-      case 180:
-        return { x: definition.width - 1 - x, y: definition.height - 1 - y }
-      case 270:
-        return { x: y, y: definition.width - 1 - x }
-      default:
-        return { x, y }
-    }
-  })
-}
-
 /**
  * Keep the 60 FPS local prediction on the same blocking geometry as the
  * authoritative simulation. The server sends the motion offsets with each
@@ -135,22 +116,12 @@ function predictedPlatforms(state: GameState): Platform[] {
     const originX = trap.x * state.level.cellSize + offsetX
     const originY = trap.y * state.level.cellSize + offsetY
 
-    if (trap.trapId === 'spring') {
-      return [{
-        id: `trap-prediction-${trap.instanceId}`,
-        x: originX,
-        y: originY,
-        width: trap.width * state.level.cellSize,
-        height: trap.height * state.level.cellSize,
-      }]
-    }
-
-    return rotatedTrapCells(definition, trap.rotation).map((cell, index) => ({
+    return pdzzTrapCollisionRects(trap.trapId, trap.rotation, state.level.cellSize).map((rect, index) => ({
       id: `trap-prediction-${trap.instanceId}-${index}`,
-      x: originX + cell.x * state.level.cellSize,
-      y: originY + cell.y * state.level.cellSize,
-      width: state.level.cellSize,
-      height: state.level.cellSize,
+      x: originX + rect.x,
+      y: originY + rect.y,
+      width: rect.width,
+      height: rect.height,
     }))
   })
   return [...mapPlatforms, ...trapPlatforms]
