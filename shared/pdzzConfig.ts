@@ -43,10 +43,10 @@ const PDZZ_TRAP_BODY_SHAPES: Record<string, {
   },
   guillotineaxe: {
     width: 5,
-    height: 2,
-    // The swinging blade is a hazard, while the lower base is the only
-    // physical support. The chain/blade area must remain passable until hit.
-    rects: [{ x: 0, y: 84, width: 250, height: 16 }],
+    height: 3,
+    // The top beam is the only solid body. The chain and yellow blade are
+    // rendered as a moving child and handled by the hazard trigger below.
+    rects: [{ x: 0, y: 0, width: 250, height: 16 }],
   },
 }
 
@@ -200,7 +200,7 @@ export const PDZZ_PHYSICS = {
       "speed": 90
     },
     "gravityFlip": {
-      "durationSeconds": 1.2,
+      "durationSeconds": 1,
       "triggerWidthCells": 2,
       "triggerHeightCells": 2
     },
@@ -212,8 +212,11 @@ export const PDZZ_PHYSICS = {
     "guillotineAxe": {
       "swingDegrees": 35,
       "swingPeriodSeconds": 1.8,
-      "bladeWidthCells": 1.8,
-      "bladeHeightCells": 0.55
+      "pivotYCells": 0.58,
+      "bladeOffsetXCells": -1.1,
+      "bladeOffsetYCells": 1.15,
+      "bladeWidthCells": 1.25,
+      "bladeHeightCells": 1.25
     }
   }
 } as const
@@ -27097,9 +27100,9 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "name": "断头摆斧",
     "description": "hazard · 巨斧沿圆弧来回摆动，碰到斧身立即淘汰",
     "width": 5,
-    "height": 2,
+    "height": 3,
     "viewWidth": 5,
-    "viewHeight": 2,
+    "viewHeight": 3,
     "cells": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1]],
     "glyph": "!",
     "color": "#e35d58",
@@ -27118,9 +27121,40 @@ export const PDZZ_COMPONENTS: PdzzComponentDefinition[] = [
     "available": true,
     "iconSource": "component",
     "iconFrame": "guillotineaxe.png",
-    "iconAsset": "/game/assets/pdzz/component-frames/guillotineaxe.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/guillotineaxe-final2.png",
     "iconCrop": { "x": 0, "y": 0, "width": 2048, "height": 2048 },
     "iconConfidence": "generated",
+    "maxCountInLevel": 0
+  },
+  {
+    "id": "bomb",
+    "name": "大炸弹",
+    "description": "bomb · 来自 APK 组件配置",
+    "width": 2,
+    "height": 2,
+    "viewWidth": 2,
+    "viewHeight": 2,
+    "cells": [[0, 0], [0, 1], [1, 0], [1, 1]],
+    "glyph": "◆",
+    "color": "#d5953d",
+    "placement": "free",
+    "effect": "kill",
+    "collisionMode": "trigger",
+    "category": "special",
+    "sourceType": "bomb",
+    "componentType": 7,
+    "defaultDir": 1,
+    "rotateMode": 0,
+    "snapToGround": false,
+    "fullrect": true,
+    "danToUnlock": 4,
+    "isVip": false,
+    "available": true,
+    "iconSource": "game",
+    "iconFrame": "bomb.png",
+    "iconAsset": "/game/assets/pdzz/component-frames/bomb.png",
+    "iconCrop": { "x": 805, "y": 104, "width": 88, "height": 98 },
+    "iconConfidence": "exact",
     "maxCountInLevel": 0
   },
   {
@@ -29440,6 +29474,8 @@ export const PDZZ_LEAGUE_COMPONENT_IDS = [
   'gravityflip',
   'flashblind',
   'guillotineaxe',
+  'bombsmall',
+  'bomb',
 ] as const
 
 /** Ground hazards and the patrol enemy must be placed on a platform top. */
@@ -29506,8 +29542,8 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
   },
   {
     id: 'gravityflip',
-    functionText: '踩上翻转板后，角色重力朝屏幕上方，持续 1.2 秒，期间会被吸向上方。',
-    configuration: '2×2 格；无实体阻挡；进入 2×2 触发区只触发一次；重力方向翻转 1.2 秒，触发时脱离当前支撑面。',
+    functionText: '碰到翻转板后，角色整体重力朝屏幕上方，持续 1 秒，期间会被吸向上方。',
+    configuration: '2×2 格；自身无实体阻挡；完整角色碰到 2×2 触发区只触发一次；向上运动仍受上方平台和机关实体阻挡，1 秒后立即恢复原有重力与碰撞。',
   },
   {
     id: 'flashblind',
@@ -29516,8 +29552,18 @@ export const PDZZ_LEAGUE_COMPONENT_GUIDE: PdzzLeagueComponentGuide[] = [
   },
   {
     id: 'guillotineaxe',
-    functionText: '巨大斧头沿圆弧往返摆动，斧身碰到角色立即淘汰。',
-    configuration: '5×2 格；摆幅 ±35°；1.8 秒一个往返周期；斧刃碰撞盒 1.8×0.55 格，随摆角旋转；底座和链条按组件实体阻挡。',
+    functionText: '顶部横梁可站立，黄色斧头沿圆弧持续单摆，黄色斧刃碰到角色立即淘汰。',
+    configuration: '5×3 格；顶部横梁为唯一实体支撑；中央转轴约位于组件顶部下方 0.58 格；摆幅 ±35°，1.8 秒一个往返周期；仅黄色斧刃 1.25×1.25 格碰撞盒随摆角移动，链条不造成伤害。',
+  },
+  {
+    id: 'bombsmall',
+    functionText: '动物实际碰到小炸弹占用区域立即淘汰。',
+    configuration: '1×1 格；自由放置；无实体阻挡；触发盒为完整 1×1 占用区域；使用 APK 的 bombsmall 原图。',
+  },
+  {
+    id: 'bomb',
+    functionText: '动物实际碰到大炸弹占用区域立即淘汰。',
+    configuration: '2×2 格；自由放置；无实体阻挡；触发盒为完整 2×2 占用区域；使用 APK 的 bomb 原图。',
   },
 ]
 

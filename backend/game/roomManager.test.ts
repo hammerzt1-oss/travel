@@ -121,11 +121,11 @@ function placementRoomState() {
 
 let placementState = placementRoomState()
 assert.equal(placementState?.status, 'BUILDING')
-assert.equal(placementState?.buildState?.options.length, 6)
-assert.equal(new Set(placementState?.buildState?.options.map((option) => option.id)).size, 6)
+assert.equal(placementState?.buildState?.options.length, 8)
+assert.equal(new Set(placementState?.buildState?.options.map((option) => option.id)).size, 8)
 assert.ok(placementState?.buildState?.options.every((option) => PDZZ_LEAGUE_COMPONENT_IDS.includes(option.id as typeof PDZZ_LEAGUE_COMPONENT_IDS[number])))
 assert.ok(placementState?.buildState?.options.every((option) => option.id !== 'ice' && option.id !== 'mud'))
-for (const guaranteedId of ['gravityflip', 'flashblind', 'gas', 'guillotineaxe', 'hunterguard', 'linearsaw']) {
+for (const guaranteedId of ['gravityflip', 'flashblind', 'gas', 'guillotineaxe', 'hunterguard', 'linearsaw', 'bombsmall', 'bomb']) {
   assert.ok(placementState?.buildState?.options.some((option) => option.id === guaranteedId), `${guaranteedId} missing from round options`)
 }
 const firstOption = placementState?.buildState?.options[0]

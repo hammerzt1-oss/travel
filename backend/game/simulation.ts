@@ -784,6 +784,14 @@ function rotateOffset(x: number, y: number, rotation: Rotation) {
   }
 }
 
+function rotateVector(x: number, y: number, degrees: number) {
+  const radians = (degrees * Math.PI) / 180
+  return {
+    x: x * Math.cos(radians) - y * Math.sin(radians),
+    y: x * Math.sin(radians) + y * Math.cos(radians),
+  }
+}
+
 function orientedRect(
   centerX: number,
   centerY: number,
@@ -966,15 +974,23 @@ function rotatedAabb(centerX: number, centerY: number, width: number, height: nu
 
 function guillotineAxeHazardRect(trap: PlacedTrap, elapsed: number, level: LevelSnapshot = LEVEL_BASE): TrapRect {
   const motion = trapMotion(trap, elapsed, level)
-  const center = trapEntityCenter(trap, elapsed, level)
+  // The visual pivot is the centre of the top beam. Keep the hazard anchored
+  // to that same point so the rendered yellow blade and the server collider
+  // never diverge while the axe swings.
   const angle = motion.visualRotation ?? trap.rotation
-  const radians = (angle * Math.PI) / 180
-  const bladeOffset = 0.65 * CELL_SIZE
+  const config = PDZZ_PHYSICS.componentMechanics.guillotineAxe
+  const pivotX = trap.x * CELL_SIZE + (trap.width * CELL_SIZE) / 2
+  const pivotY = trap.y * CELL_SIZE + config.pivotYCells * CELL_SIZE
+  const rotatedOffset = rotateVector(
+    config.bladeOffsetXCells * CELL_SIZE,
+    config.bladeOffsetYCells * CELL_SIZE,
+    angle,
+  )
   return rotatedAabb(
-    center.x - Math.sin(radians) * bladeOffset,
-    center.y + Math.cos(radians) * bladeOffset,
-    PDZZ_PHYSICS.componentMechanics.guillotineAxe.bladeWidthCells * CELL_SIZE,
-    PDZZ_PHYSICS.componentMechanics.guillotineAxe.bladeHeightCells * CELL_SIZE,
+    pivotX + rotatedOffset.x,
+    pivotY + rotatedOffset.y,
+    config.bladeWidthCells * CELL_SIZE,
+    config.bladeHeightCells * CELL_SIZE,
     angle,
   )
 }
@@ -1729,6 +1745,18 @@ export class GameSimulation {
           PLAYER_WIDTH,
           PLAYER_HEIGHT,
         ) || sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, sawBounds)) {
+          this.kill(player, trap.ownerId, false, trap.trapId)
+          return
+        }
+        continue
+      }
+      if (trap.trapId === 'bomb' || trap.trapId === 'bombsmall') {
+        // Bombs are trigger-only APK entities: they do not form a wall, and
+        // the complete authored footprint is the lethal contact area.
+        const bombRects = trapCellRects(trap, this.elapsed, this.level)
+        if (bombRects.some((rect) =>
+          sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, rect),
+        )) {
           this.kill(player, trap.ownerId, false, trap.trapId)
           return
         }

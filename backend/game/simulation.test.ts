@@ -970,6 +970,10 @@ assert.ok(gravityFlipPlayer.velocityY < 0)
 const gravityFlipYAfterContact = gravityFlipPlayer.y
 gravityFlipSimulation.tick(1 / 60)
 assert.ok(gravityFlipPlayer.y < gravityFlipYAfterContact)
+for (let index = 0; index < 45; index += 1) gravityFlipSimulation.tick(1 / 60)
+assert.equal(gravityFlipSimulation.snapshot('PLAYING').players[0].gravityFlipped, true)
+for (let index = 0; index < 20; index += 1) gravityFlipSimulation.tick(1 / 60)
+assert.equal(gravityFlipSimulation.snapshot('PLAYING').players[0].gravityFlipped, false)
 
 const flashBlind: PlacedTrap = {
   instanceId: 'flash-blind-1',
@@ -1017,5 +1021,74 @@ const axeRotationAtStart = guillotineAtStart.snapshot('PLAYING').level.traps[0].
 guillotineAtStart.tick(0.45)
 const axeRotationInMotion = guillotineAtStart.snapshot('PLAYING').level.traps[0].visualRotation
 assert.notEqual(axeRotationAtStart, axeRotationInMotion)
+
+// The top beam is a solid support; only the yellow blade is lethal.
+const axeBeamSimulation = new GameSimulation(
+  1,
+  [{ id: 'axe-beam-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'guillotine-beam-1',
+    trapId: 'guillotineaxe',
+    ownerId: 'p1',
+    x: 20,
+    y: 8,
+    width: 5,
+    height: 3,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const axeBeamPlayer = axeBeamSimulation.players.get('axe-beam-player')
+assert.ok(axeBeamPlayer)
+axeBeamPlayer.x = 1010
+axeBeamPlayer.y = 340
+axeBeamSimulation.tick(1 / 60)
+assert.equal(axeBeamPlayer.alive, true)
+
+const axeBladeSimulation = new GameSimulation(
+  1,
+  [{ id: 'axe-blade-player', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'guillotine-blade-1',
+    trapId: 'guillotineaxe',
+    ownerId: 'p1',
+    x: 20,
+    y: 8,
+    width: 5,
+    height: 3,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const axeBladePlayer = axeBladeSimulation.players.get('axe-blade-player')
+assert.ok(axeBladePlayer)
+axeBladePlayer.x = 1050
+axeBladePlayer.y = 520
+axeBladeSimulation.tick(1 / 60)
+assert.equal(axeBladePlayer.alive, false)
+
+for (const [trapId, width, height] of [['bombsmall', 1, 1] as const, ['bomb', 2, 2] as const]) {
+  const bombSimulation = new GameSimulation(
+    1,
+    [{ id: `${trapId}-player`, slot: 1, label: 'Player 1', score: 0 }],
+    [{
+      instanceId: `${trapId}-1`,
+      trapId,
+      ownerId: 'p1',
+      x: 20,
+      y: 8,
+      width,
+      height,
+      rotation: 0,
+      placedRound: 1,
+    }],
+  )
+  const bombPlayer = bombSimulation.players.get(`${trapId}-player`)
+  assert.ok(bombPlayer)
+  bombPlayer.x = 1000
+  bombPlayer.y = 400
+  bombSimulation.tick(1 / 60)
+  assert.equal(bombPlayer.alive, false, `${trapId} must kill on footprint contact`)
+}
 
 console.log('simulation tests passed')

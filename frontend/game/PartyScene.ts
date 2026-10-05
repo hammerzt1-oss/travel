@@ -9,6 +9,7 @@ import {
   PDZZ_CHARACTERS,
   PDZZ_COMPONENTS,
   PDZZ_MAP_CATALOG,
+  PDZZ_PHYSICS,
   pdzzTrapRequiresGroundSupport,
 } from '../../shared/pdzzConfig'
 
@@ -334,6 +335,12 @@ export class PartyScene extends Phaser.Scene {
       if (component.iconAsset) {
         this.load.image(`pdzz-component-image-${component.id}`, component.iconAsset)
       }
+    }
+    if (!this.textures.exists('pdzz-guillotine-base')) {
+      this.load.image('pdzz-guillotine-base', '/game/assets/pdzz/component-frames/guillotineaxe-base.png')
+    }
+    if (!this.textures.exists('pdzz-guillotine-blade')) {
+      this.load.image('pdzz-guillotine-blade', '/game/assets/pdzz/component-frames/guillotineaxe-blade.png')
     }
     // The build screen only needs the selected map. Loading every map atlas
     // here delayed the real map behind an empty CSS sky. Defer the remaining
@@ -697,6 +704,20 @@ export class PartyScene extends Phaser.Scene {
     return this.addTextureImage(container, { key: 'pdzz-game', frame }, x, y, scale, originX, originY)
   }
 
+  private addDirectImage(
+    container: Phaser.GameObjects.Container,
+    key: string,
+    x: number,
+    y: number,
+    originX = 0.5,
+    originY = 0.5,
+  ) {
+    if (!this.textures.exists(key)) return null
+    const image = this.add.image(x, y, key).setOrigin(originX, originY)
+    container.add(image)
+    return image
+  }
+
   private trapVisualAnchor(
     trapId: string,
     x: number,
@@ -769,7 +790,9 @@ export class PartyScene extends Phaser.Scene {
       trap.trapId,
       phase,
       trap.rotation,
-      trap.trapId === 'linearsaw' ? trap.rotation : (trap.visualRotation ?? trap.rotation),
+      trap.trapId === 'linearsaw' || trap.trapId === 'guillotineaxe'
+        ? trap.rotation
+        : (trap.visualRotation ?? trap.rotation),
       trap.trapId === 'hunterguard' ? 0 : (trap.offsetX ?? 0),
       trap.trapId === 'hunterguard' ? 0 : (trap.offsetY ?? 0),
       animationStep,
@@ -798,6 +821,16 @@ export class PartyScene extends Phaser.Scene {
     stand.setAngle(trap.rotation)
     saw.setPosition(position.x, position.y)
     saw.setAngle(position.rotation)
+  }
+
+  private updateGuillotineVisual(
+    container: Phaser.GameObjects.Container,
+    trap: GameState['level']['traps'][number],
+  ) {
+    const swingLayer = container.list[1]
+    if (!(swingLayer instanceof Phaser.GameObjects.Container)) return
+    const angle = (trap.visualRotation ?? trap.rotation) - trap.rotation
+    swingLayer.setAngle(angle)
   }
 
   private rebuildTrapVisual(
@@ -835,7 +868,22 @@ export class PartyScene extends Phaser.Scene {
       return
     }
 
-    if (trap.trapId === 'gravityflip' || trap.trapId === 'flashblind' || trap.trapId === 'guillotineaxe') {
+    if (trap.trapId === 'guillotineaxe') {
+      // The generated art is split into a fixed top beam and a transparent
+      // moving layer. Both use the same 5x3 footprint as the server collider.
+      const base = this.addDirectImage(container, 'pdzz-guillotine-base', 0, 0)
+      base?.setDisplaySize(component.width * cell, component.height * cell)
+      const swingPivotY = PDZZ_PHYSICS.componentMechanics.guillotineAxe.pivotYCells * cell
+        - (component.height * cell) / 2
+      const swingLayer = this.add.container(0, swingPivotY)
+      const blade = this.addDirectImage(swingLayer, 'pdzz-guillotine-blade', 0, 0, 0.5, 0.15)
+      blade?.setDisplaySize(component.width * cell, component.height * cell)
+      container.add(swingLayer)
+      this.updateGuillotineVisual(container, trap)
+      return
+    }
+
+    if (trap.trapId === 'gravityflip' || trap.trapId === 'flashblind') {
       const texture = this.componentTexture(component)
       if (!texture) return
       const image = this.addTextureImage(container, texture, 0, 0)
@@ -1005,6 +1053,7 @@ export class PartyScene extends Phaser.Scene {
         this.trapRenderSignatures.set(trap.instanceId, signature)
       }
       if (trap.trapId === 'linearsaw') this.updateLinearSawVisual(sprite, trap)
+      if (trap.trapId === 'guillotineaxe') this.updateGuillotineVisual(sprite, trap)
       const visualAnchor = this.trapVisualAnchor(
         trap.trapId,
         trap.x,
@@ -1018,7 +1067,7 @@ export class PartyScene extends Phaser.Scene {
         .setPosition(visualAnchor.x + offsetX, visualAnchor.y + offsetY)
         .setAngle(trap.trapId === 'linearsaw'
           ? 0
-          : trap.trapId === 'triggerspikes'
+          : trap.trapId === 'triggerspikes' || trap.trapId === 'guillotineaxe'
             ? visualAnchor.angle
             : (trap.visualRotation ?? trap.rotation))
     }
