@@ -68,6 +68,8 @@ type PlayerTrack = {
     fallingTime: number
     extraHorizontalAirSpeed: number
     springContactId: string | null
+    reverseControls: boolean
+    gravityFlipped: boolean
     updatedAt: number
     correctionX: number
     correctionY: number
@@ -416,6 +418,11 @@ export class LayaCharacterRenderer {
         previous.localPrediction = this.createLocalPrediction(sample, player, receivedAt)
         return
       }
+      // Effect flags are authoritative state. Keep them on the prediction
+      // object so the 60 FPS path applies gas reversal and gravity-flip
+      // immediately instead of waiting for a position correction.
+      prediction.reverseControls = Boolean(player.reverseControls)
+      prediction.gravityFlipped = Boolean(player.gravityFlipped)
       this.advanceLocalPrediction(receivedAt)
       const acknowledgedSequence = Number.isFinite(player.lastProcessedInputSequence)
         ? Math.max(0, Math.floor(player.lastProcessedInputSequence))
@@ -516,6 +523,8 @@ export class LayaCharacterRenderer {
       fallingTime: 0,
       extraHorizontalAirSpeed: 0,
       springContactId: null as string | null,
+      reverseControls: Boolean(player.reverseControls),
+      gravityFlipped: Boolean(player.gravityFlipped),
       updatedAt: receivedAt,
       correctionX: 0,
       correctionY: 0,
@@ -549,7 +558,8 @@ export class LayaCharacterRenderer {
     if (wallClinging && prediction.extraHorizontalAirSpeed * prediction.wallDirection < 0) {
       prediction.extraHorizontalAirSpeed = 0
     }
-    const horizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
+    const rawHorizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
+    const horizontal = prediction.reverseControls ? -rawHorizontal : rawHorizontal
     const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
     let inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
     if (horizontal !== 0) {
@@ -566,7 +576,9 @@ export class LayaCharacterRenderer {
     let deltaX = 0
     let deltaY = 0
     if (prediction.jumping || !wasGrounded) {
-      const gravity = wallClinging
+      const gravity = prediction.gravityFlipped
+        ? -PDZZ_PHYSICS.playerDerived.gravity
+        : wallClinging
         ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.wallGravityVariation
         : prediction.fallingTime > 0
           ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.fallGravityVariation

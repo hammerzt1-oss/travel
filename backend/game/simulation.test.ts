@@ -583,6 +583,13 @@ gasPlayer.x = 110
 gasPlayer.y = 500
 gasSimulation.tick(1 / 60)
 assert.equal(gasPlayer.reverseUntil, Number.POSITIVE_INFINITY)
+assert.equal(gasSimulation.snapshot('PLAYING').players[0].reverseControls, true)
+gasSimulation.setInput('gas-player', { left: false, right: true, jump: false }, 1)
+gasSimulation.tick(1 / 60)
+assert.ok(gasPlayer.velocityX < 0, 'right input must move left while inside reverse gas')
+gasPlayer.x = 110
+gasPlayer.velocityX = 0
+gasSimulation.setInput('gas-player', { left: false, right: false, jump: false }, 2)
 for (let index = 0; index < 30; index += 1) gasSimulation.tick(1 / 60)
 assert.equal(gasPlayer.reverseUntil, Number.POSITIVE_INFINITY)
 gasPlayer.x = 0
@@ -958,6 +965,7 @@ gravityFlipPlayer.y = 950
 gravityFlipPlayer.onGround = false
 gravityFlipSimulation.tick(1 / 60)
 assert.ok(gravityFlipPlayer.gravityFlipUntil > 0)
+assert.equal(gravityFlipSimulation.snapshot('PLAYING').players[0].gravityFlipped, true)
 assert.ok(gravityFlipPlayer.velocityY < 0)
 const gravityFlipYAfterContact = gravityFlipPlayer.y
 gravityFlipSimulation.tick(1 / 60)

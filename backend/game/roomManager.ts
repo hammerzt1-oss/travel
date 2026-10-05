@@ -122,7 +122,11 @@ function makeOptions() {
   // Keep the four newly implemented components and the horizontal saw visible
   // in every round. The remaining card is randomized from the rest of the
   // league pool, while removed ice/mud entries cannot enter this list.
-  const guaranteedIds = ['gravityflip', 'flashblind', 'guillotineaxe', 'hunterguard', 'linearsaw'] as const
+  // Keep both effect-only league triggers available for every build phase:
+  // gravityflip is the upward-pull plate and gas is the reverse-control mist.
+  // The current six-card league build is the five existing guaranteed cards
+  // plus gas, so neither effect can disappear from the selector by chance.
+  const guaranteedIds = ['gravityflip', 'flashblind', 'gas', 'guillotineaxe', 'hunterguard', 'linearsaw'] as const
   const ids = PDZZ_LEAGUE_COMPONENT_IDS.filter(
     (id) => !guaranteedIds.includes(id as (typeof guaranteedIds)[number]),
   )
@@ -130,7 +134,7 @@ function makeOptions() {
     const swapIndex = Math.floor(Math.random() * (index + 1))
     ;[ids[index], ids[swapIndex]] = [ids[swapIndex], ids[index]]
   }
-  const selectedIds = [...guaranteedIds, ...ids.slice(0, 1)]
+  const selectedIds = [...guaranteedIds]
   for (let index = selectedIds.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1))
     ;[selectedIds[index], selectedIds[swapIndex]] = [selectedIds[swapIndex], selectedIds[index]]

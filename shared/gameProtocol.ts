@@ -132,6 +132,10 @@ export type PlayerSnapshot = {
   deathReason?: DeathReason | null
   /** The local player is currently inside the two-second flash blind effect. */
   blinded?: boolean
+  /** The gas trigger currently reverses horizontal input for this player. */
+  reverseControls?: boolean
+  /** The gravity-flip trigger currently pulls the player upward. */
+  gravityFlipped?: boolean
   /** Highest client input sequence already consumed by the authoritative tick. */
   lastProcessedInputSequence: number
   bot?: boolean

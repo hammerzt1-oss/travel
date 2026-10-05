@@ -1282,7 +1282,6 @@ export class GameSimulation {
     this.elapsed = Math.min(PLAY_DURATION_SECONDS, this.elapsed + dt)
     this.updateSwitches()
     this.updateSurfaceStates()
-    this.updateGasStates()
     this.updateProjectiles(dt)
     const previousPositions = new Map<string, { x: number; y: number }>()
     for (const player of this.players.values()) {
@@ -1301,6 +1300,9 @@ export class GameSimulation {
     // controller. This catches an enter event even when the body crossed the
     // trigger between two fixed snapshots.
     this.updateTrapStates(previousPositions)
+    // Gas is a non-solid trigger. Resolve it after movement using the same
+    // segment so a fast player cannot cross the inner box between snapshots.
+    this.updateGasStates(previousPositions)
     this.resolvePlayerCollision()
     if (this.elapsed >= PLAY_DURATION_SECONDS) {
       for (const player of this.players.values()) {
@@ -2360,7 +2362,7 @@ export class GameSimulation {
     })
   }
 
-  private updateGasStates() {
+  private updateGasStates(previousPositions: Map<string, { x: number; y: number }>) {
     const previousGasPlayers = new Set<string>()
     for (const key of this.gasOccupants) {
       const separator = key.indexOf(':')
@@ -2392,13 +2394,21 @@ export class GameSimulation {
       for (const player of this.players.values()) {
         if (!player.alive || player.finished) continue
         const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
+        const previous = previousPositions.get(player.id) ?? { x: player.x, y: player.y }
         const key = `${trap.instanceId}:${player.id}`
         const insideInner = overlaps(body.x, body.y, body.width, body.height, inner.x, inner.y, inner.width, inner.height)
         const insideOuter = overlaps(body.x, body.y, body.width, body.height, outer.x, outer.y, outer.width, outer.height)
+        const crossedInner = sweptPlayerOverlapsRect(
+          previous.x,
+          previous.y,
+          player.x,
+          player.y,
+          inner,
+        )
 
         // APK enterGas is an enter event. Staying inside the inner box must
         // never refresh the effect on every fixed tick.
-        if (insideInner) this.gasOccupants.add(key)
+        if (insideInner || crossedInner) this.gasOccupants.add(key)
         // APK exitGas is attached to the 2x2 outer trigger. Once that trigger
         // is left, this gas is removed from the player's active gas list.
         else if (!insideOuter) this.gasOccupants.delete(key)
@@ -2566,6 +2576,8 @@ export class GameSimulation {
       deathTrapId: player.deathTrapId,
       deathReason: player.deathReason,
       blinded: player.blindUntil > this.elapsed,
+      reverseControls: player.reverseUntil > this.elapsed,
+      gravityFlipped: player.gravityFlipUntil > this.elapsed,
       lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,
     }
