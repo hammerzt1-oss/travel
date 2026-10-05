@@ -21,6 +21,7 @@ const allowedOrigins = configuredOrigins.includes('*')
       ...configuredOrigins,
       'https://travel-woad-five.vercel.app',
       'https://travel-r1q3.vercel.app',
+      'https://audio.travelstudent.cloud',
     ]))
 const corsOrigin = allowedOrigins.includes('*') ? '*' : allowedOrigins
 const httpCorsOrigin = (origin: string | undefined, callback: (error: Error | null, value?: boolean) => void) => {
