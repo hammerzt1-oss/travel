@@ -119,9 +119,9 @@ function isRotation(value: unknown): value is Rotation {
 }
 
 function makeOptions() {
-  // Keep the currently implemented league components visible in every build
-  // phase, including both APK bomb sizes. The order is shuffled per round so
-  // the selector is not predictable while every mechanic remains testable.
+  // Keep the APK league components and the five new authored components
+  // visible in every build phase. The order is shuffled per round so every
+  // mechanic remains testable without making the selector predictable.
   const guaranteedIds = [
     'gravityflip',
     'flashblind',
@@ -129,6 +129,11 @@ function makeOptions() {
     'guillotineaxe',
     'hunterguard',
     'linearsaw',
+    'bouncepad',
+    'magnetcore',
+    'freezebubble',
+    'moonbubble',
+    'gustlauncher',
     'bombsmall',
     'bomb',
   ] as const
@@ -806,6 +811,7 @@ export class RoomManager {
 
   private startPlaying(room: Room) {
     if (room.status !== 'COUNTDOWN' || !room.simulation) return
+    room.simulation.armBombFuses()
     room.status = 'PLAYING'
     room.countdownEndsAt = null
     room.countdownValue = null

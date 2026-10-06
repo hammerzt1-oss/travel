@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node node_modules/next/dist/bin/next dev",
     "build": "node node_modules/next/dist/bin/next build",
+    "postbuild": "node -e \"require('fs').rmSync('.next/cache', { recursive: true, force: true })\"",
     "start": "node node_modules/next/dist/bin/next start",
     "check": "node node_modules/typescript/bin/tsc --noEmit"
   },

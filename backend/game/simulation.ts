@@ -102,6 +102,7 @@ type Surface = Platform & { trap?: PlacedTrap; definition?: TrapDefinition }
 const componentEffect = (effect: string): TrapEffect => {
   if (
     effect === 'kill' ||
+    effect === 'bomb' ||
     effect === 'ice' ||
     effect === 'bounce' ||
     effect === 'slow' ||
@@ -109,7 +110,11 @@ const componentEffect = (effect: string): TrapEffect => {
     effect === 'wall' ||
     effect === 'boost' ||
     effect === 'wind' ||
-    effect === 'reverse'
+    effect === 'reverse' ||
+    effect === 'freeze' ||
+    effect === 'magnet' ||
+    effect === 'low-gravity' ||
+    effect === 'swap'
   ) {
     return effect
   }
@@ -548,6 +553,7 @@ const GRAVITY_FLIP_DURATION = PDZZ_PHYSICS.componentMechanics.gravityFlip.durati
 const FLASH_BLIND_DURATION = PDZZ_PHYSICS.componentMechanics.flashBlind.durationSeconds
 const GUILLOTINE_SWING_DEGREES = PDZZ_PHYSICS.componentMechanics.guillotineAxe.swingDegrees
 const GUILLOTINE_SWING_PERIOD = PDZZ_PHYSICS.componentMechanics.guillotineAxe.swingPeriodSeconds
+const CREATIVE_COMPONENTS = PDZZ_PHYSICS.componentMechanics.creativeComponents
 
 function linearSawPingPong(elapsed: number) {
   // APK Cf mover: pingPong(elapsed * speed / offset, 1), then sineInOut.
@@ -1161,6 +1167,10 @@ export class GameSimulation {
   private crumbleStartedAt = new Map<string, number>()
   private finishTriggerOccupants = new Set<string>()
   private trapActivationAt = new Map<string, number>()
+  /** Bomb fuses start when the countdown ends, never during the build phase. */
+  private bombsArmed = false
+  /** APK bomb entities destroy themselves 750ms after entering the level. */
+  private bombDetonationAt = new Map<string, number>()
   /** Last collision normal for each player/spring pair, matching vv's enter/stay state. */
   private springContacts = new Map<string, Rotation>()
   /** Gas keeps an entered player in its inner-state until the outer box exits. */
@@ -1262,9 +1272,16 @@ export class GameSimulation {
 
   setPlacedTraps(placedTraps: PlacedTrap[]) {
     this.placedTraps = placedTraps.map((trap) => ({ ...trap }))
+    if (this.bombsArmed) this.registerBombTimers(this.placedTraps)
     for (const player of this.players.values()) {
       if (player.bot) this.aiPaths.set(player.id, buildAiPath(this.level, this.placedTraps))
     }
+  }
+
+  /** Begin component fuses at the same boundary as the PLAYING phase. */
+  armBombFuses() {
+    this.bombsArmed = true
+    this.registerBombTimers(this.placedTraps)
   }
 
   setConnected(playerId: string, connected: boolean) {
@@ -1296,6 +1313,7 @@ export class GameSimulation {
   tick(dt: number) {
     if (this.isComplete()) return
     this.elapsed = Math.min(PLAY_DURATION_SECONDS, this.elapsed + dt)
+    this.detonateDueBombs()
     this.updateSwitches()
     this.updateSurfaceStates()
     this.updateProjectiles(dt)
@@ -1688,7 +1706,7 @@ export class GameSimulation {
       if (this.isTrapDisabled(trap)) continue
       const rects = this.trapHazardRects(trap)
       if (['cannon', 'crossbow', 'ballooncannon', 'lasershooter'].includes(trap.trapId)) continue
-      if (trap.trapId === 'gas') continue
+      if (trap.trapId === 'gas' || trap.trapId === 'freezebubble' || trap.trapId === 'moonbubble') continue
       if (trap.trapId === 'fortunecat' || trap.trapId === 'triggerhazard' || trap.trapId === 'triggerspikes') {
         if (!this.isTrapHazardActive(trap)) continue
       }
@@ -1750,18 +1768,9 @@ export class GameSimulation {
         }
         continue
       }
-      if (trap.trapId === 'bomb' || trap.trapId === 'bombsmall') {
-        // Bombs are trigger-only APK entities: they do not form a wall, and
-        // the complete authored footprint is the lethal contact area.
-        const bombRects = trapCellRects(trap, this.elapsed, this.level)
-        if (bombRects.some((rect) =>
-          sweptPlayerOverlapsRect(previousX, previousY, player.x, player.y, rect),
-        )) {
-          this.kill(player, trap.ownerId, false, trap.trapId)
-          return
-        }
-        continue
-      }
+      // APK bomb entities do not create a player trigger or a platform. Their
+      // only runtime effect is handled by detonateDueBombs() above.
+      if (trap.trapId === 'bomb' || trap.trapId === 'bombsmall') continue
       for (const rect of rects) {
         const sweptContact = sweptPlayerOverlapsRect(
           previousX,
@@ -1796,7 +1805,9 @@ export class GameSimulation {
       }
       if (definition.effect === 'wind') {
         const fan = trapWorldRect(trap, this.elapsed, this.level)
-        const range = PDZZ_PHYSICS.playerDerived.fanRangePixels
+        const range = trap.trapId === 'gustlauncher'
+          ? CREATIVE_COMPONENTS.gustLauncher.rangeCells * CELL_SIZE
+          : PDZZ_PHYSICS.playerDerived.fanRangePixels
         const inRange = trap.rotation === 90
           ? overlaps(player.x, player.y, PLAYER_WIDTH, PLAYER_HEIGHT, fan.x + CELL_SIZE, fan.y, range, CELL_SIZE)
           : trap.rotation === 180
@@ -1809,6 +1820,33 @@ export class GameSimulation {
           if (!player.alive || player.finished) return
         }
       }
+    }
+
+    // Magnet cores apply a continuous radial force, rather than a one-frame
+    // trigger. This is intentionally resolved after character movement so the
+    // next fixed tick immediately reflects the changed velocity.
+    for (const trap of this.placedTraps) {
+      if (trap.trapId !== 'magnetcore' || this.isTrapDisabled(trap)) continue
+      const center = trapEntityCenter(trap, this.elapsed, this.level)
+      const playerCenterX = player.x + PLAYER_WIDTH / 2
+      const playerCenterY = player.y + PLAYER_HEIGHT / 2
+      const deltaX = center.x - playerCenterX
+      const deltaY = center.y - playerCenterY
+      const distance = Math.hypot(deltaX, deltaY)
+      const radius = CREATIVE_COMPONENTS.magnetCore.radiusCells * CELL_SIZE
+      if (distance <= 0.001 || distance > radius) continue
+      const falloff = 0.35 + 0.65 * (1 - distance / radius)
+      const acceleration = CREATIVE_COMPONENTS.magnetCore.pullAcceleration * falloff
+      player.velocityX = clamp(
+        player.velocityX + (deltaX / distance) * acceleration * dt,
+        -CREATIVE_COMPONENTS.magnetCore.maxPullSpeed,
+        CREATIVE_COMPONENTS.magnetCore.maxPullSpeed,
+      )
+      player.velocityY = clamp(
+        player.velocityY + (deltaY / distance) * acceleration * dt,
+        -CREATIVE_COMPONENTS.magnetCore.maxPullSpeed,
+        CREATIVE_COMPONENTS.magnetCore.maxPullSpeed,
+      )
     }
 
     // CharacterController.getIsOutOfBounds checks the entity foot position
@@ -2069,6 +2107,11 @@ export class GameSimulation {
       case 'kill':
         this.kill(player, trap.ownerId, false, trap.trapId)
         return
+      case 'bomb':
+        // Bombs never enter this path because collisionMode is none. Keep the
+        // effect explicit so the authored definition cannot become a player
+        // hazard if a caller supplies an overlapping trap rectangle later.
+        return
       case 'ice':
         // Maintained by updateSurfaceStates() until the trigger exit event.
         return
@@ -2076,14 +2119,18 @@ export class GameSimulation {
         if (trap.trapId === 'spring') this.applySpringEffect(player, trap)
         else {
           player.y = Math.min(player.y, trapY - PLAYER_HEIGHT)
-          const springVelocity = PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(
-            PHYSICS.componentMechanics.spring.jumpHeightMultiplier,
-          )
+          const jumpHeightMultiplier = trap.trapId === 'bouncepad'
+            ? CREATIVE_COMPONENTS.bouncePad.jumpHeightMultiplier
+            : PHYSICS.componentMechanics.spring.jumpHeightMultiplier
+          const springVelocity = PHYSICS.playerDerived.normalJumpStartVelocity * Math.sqrt(jumpHeightMultiplier)
           player.velocityY = trap.trapId === 'triggerspring'
             ? springVelocity * PHYSICS.componentMechanics.spring.triggerSpringVelocityMultiplier
             : springVelocity
           player.onGround = false
-          player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.55)
+          player.trapCooldowns.set(
+            trap.instanceId,
+            this.elapsed + (trap.trapId === 'bouncepad' ? CREATIVE_COMPONENTS.bouncePad.cooldownSeconds : 0.55),
+          )
         }
         return
       case 'slow':
@@ -2126,10 +2173,18 @@ export class GameSimulation {
       case 'wall':
         return
       case 'wind': {
+        const isGustLauncher = trap.trapId === 'gustlauncher'
         const direction = trap.rotation === 90 || trap.rotation === 180 ? -1 : 1
-        player.velocityX += direction * PHYSICS.playerDerived.fanHorizontalPushPerTick
-        player.velocityY -= PHYSICS.playerDerived.gravity * PHYSICS.playerDerived.fanVerticalPushGravityMultiplier[0] * 0.017
-        player.trapCooldowns.set(trap.instanceId, this.elapsed + 0.22)
+        player.velocityX += direction * (isGustLauncher
+          ? CREATIVE_COMPONENTS.gustLauncher.horizontalPushPerTick
+          : PHYSICS.playerDerived.fanHorizontalPushPerTick)
+        player.velocityY -= isGustLauncher
+          ? CREATIVE_COMPONENTS.gustLauncher.verticalLiftPerTick
+          : PHYSICS.playerDerived.gravity * PHYSICS.playerDerived.fanVerticalPushGravityMultiplier[0] * 0.017
+        player.trapCooldowns.set(
+          trap.instanceId,
+          this.elapsed + (isGustLauncher ? CREATIVE_COMPONENTS.gustLauncher.cooldownSeconds : 0.22),
+        )
         return
       }
       case 'reverse':
@@ -2138,7 +2193,20 @@ export class GameSimulation {
         player.trapCooldowns.set(trap.instanceId, this.elapsed + 2)
         return
       case 'freeze':
-        player.freezeUntil = this.elapsed + 1.2
+        player.freezeUntil = this.elapsed + (
+          trap.trapId === 'freezebubble' ? CREATIVE_COMPONENTS.freezeBubble.durationSeconds : 1.2
+        )
+        player.trapCooldowns.set(trap.instanceId, player.freezeUntil)
+        return
+      case 'magnet':
+        // The magnetic pull is continuous and resolved after movement below.
+        return
+      case 'low-gravity':
+        player.lowGravityUntil = Math.max(
+          player.lowGravityUntil,
+          this.elapsed + CREATIVE_COMPONENTS.moonBubble.durationSeconds,
+        )
+        player.trapCooldowns.set(trap.instanceId, player.lowGravityUntil)
         return
       default:
         return
@@ -2228,12 +2296,26 @@ export class GameSimulation {
     }
     if (trap.trapId === 'gravityflip') return age < GRAVITY_FLIP_DURATION ? 'active' : 'reverting'
     if (trap.trapId === 'flashblind') return age < FLASH_BLIND_DURATION ? 'active' : 'reverting'
+    if (trap.trapId === 'freezebubble') {
+      return age < CREATIVE_COMPONENTS.freezeBubble.durationSeconds ? 'active' : 'reverting'
+    }
+    if (trap.trapId === 'moonbubble') {
+      return age < CREATIVE_COMPONENTS.moonBubble.durationSeconds ? 'active' : 'reverting'
+    }
     return 'idle'
   }
 
   private updateTrapStates(previousPositions: Map<string, { x: number; y: number }>) {
     for (const trap of this.placedTraps) {
-      if (!['fortunecat', 'triggerhazard', 'triggerspikes', 'gravityflip', 'flashblind'].includes(trap.trapId)) continue
+      if (![
+        'fortunecat',
+        'triggerhazard',
+        'triggerspikes',
+        'gravityflip',
+        'flashblind',
+        'freezebubble',
+        'moonbubble',
+      ].includes(trap.trapId)) continue
       const started = this.trapActivationAt.get(trap.instanceId)
       if (started !== undefined) {
         const lifetime = trap.trapId === 'triggerspikes'
@@ -2244,7 +2326,11 @@ export class GameSimulation {
               ? 2.1
               : trap.trapId === 'gravityflip'
                 ? GRAVITY_FLIP_DURATION
-                : FLASH_BLIND_DURATION
+              : trap.trapId === 'flashblind'
+                ? FLASH_BLIND_DURATION
+                : trap.trapId === 'freezebubble'
+                  ? CREATIVE_COMPONENTS.freezeBubble.durationSeconds
+                  : CREATIVE_COMPONENTS.moonBubble.durationSeconds
         if (this.elapsed - started >= lifetime) this.trapActivationAt.delete(trap.instanceId)
       }
       const cells = trapCellRects(trap, this.elapsed, this.level)
@@ -2324,6 +2410,15 @@ export class GameSimulation {
             trigger,
           )
         }
+        if (trap.trapId === 'freezebubble' || trap.trapId === 'moonbubble') {
+          inside = cells.some((occupiedCell) => sweptPlayerOverlapsRect(
+            previousPositions.get(player.id)?.x ?? player.x,
+            previousPositions.get(player.id)?.y ?? player.y,
+            player.x,
+            player.y,
+            occupiedCell,
+          ))
+        }
         if (inside) {
           const entered = !this.trapTriggerOccupants.has(key)
           if (entered) {
@@ -2335,6 +2430,10 @@ export class GameSimulation {
               player.velocityY = Math.min(player.velocityY, -180)
             } else if (trap.trapId === 'flashblind') {
               player.blindUntil = Math.max(player.blindUntil, this.elapsed + FLASH_BLIND_DURATION)
+            } else if (trap.trapId === 'freezebubble') {
+              this.applyTrapEffect(player, trap, 'freeze')
+            } else if (trap.trapId === 'moonbubble') {
+              this.applyTrapEffect(player, trap, 'low-gravity')
             }
           }
           this.trapTriggerOccupants.add(key)
@@ -2470,6 +2569,66 @@ export class GameSimulation {
       return started !== undefined && this.elapsed - started >= 0.7
     }
     return false
+  }
+
+  private registerBombTimers(traps: PlacedTrap[]) {
+    const activeIds = new Set(traps.map((trap) => trap.instanceId))
+    for (const instanceId of this.bombDetonationAt.keys()) {
+      if (!activeIds.has(instanceId)) this.bombDetonationAt.delete(instanceId)
+    }
+    for (const trap of traps) {
+      if ((trap.trapId === 'bomb' || trap.trapId === 'bombsmall') && !this.bombDetonationAt.has(trap.instanceId)) {
+        this.bombDetonationAt.set(trap.instanceId, this.elapsed + 0.75)
+      }
+    }
+  }
+
+  /**
+   * Mirrors the APK bomb class: the bomb is not a player hazard. After its
+   * short fuse it removes components whose authored cells overlap its own
+   * footprint. Nested bombs are processed in the same detonation chain.
+   */
+  private detonateDueBombs() {
+    if (!this.bombsArmed) return
+    const queue = this.placedTraps.filter((trap) =>
+      (trap.trapId === 'bomb' || trap.trapId === 'bombsmall') &&
+      (this.bombDetonationAt.get(trap.instanceId) ?? Infinity) <= this.elapsed,
+    )
+    if (queue.length === 0) return
+
+    const destroyedIds = new Set<string>()
+    while (queue.length > 0) {
+      const bomb = queue.shift()!
+      if (destroyedIds.has(bomb.instanceId)) continue
+      const bombCells = trapCellRects(bomb, this.elapsed, this.level)
+      for (const candidate of this.placedTraps) {
+        if (destroyedIds.has(candidate.instanceId)) continue
+        const candidateCells = trapCellRects(candidate, this.elapsed, this.level)
+        const overlapsBomb = bombCells.some((bombCell) => candidateCells.some((candidateCell) =>
+          overlaps(
+            bombCell.x,
+            bombCell.y,
+            bombCell.width,
+            bombCell.height,
+            candidateCell.x,
+            candidateCell.y,
+            candidateCell.width,
+            candidateCell.height,
+          ),
+        ))
+        if (!overlapsBomb) continue
+        destroyedIds.add(candidate.instanceId)
+        if (candidate.trapId === 'bomb' || candidate.trapId === 'bombsmall') queue.push(candidate)
+      }
+      destroyedIds.add(bomb.instanceId)
+    }
+
+    this.placedTraps = this.placedTraps.filter((trap) => !destroyedIds.has(trap.instanceId))
+    for (const instanceId of destroyedIds) {
+      this.bombDetonationAt.delete(instanceId)
+      this.trapActivationAt.delete(instanceId)
+    }
+    this.registerBombTimers(this.placedTraps)
   }
 
   private updateProjectiles(dt: number) {

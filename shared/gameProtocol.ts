@@ -15,6 +15,7 @@ export type Rotation = 0 | 90 | 180 | 270
 export type AnimationState = 'idle' | 'run' | 'jump' | 'fall' | 'death' | 'win'
 export type TrapEffect =
   | 'kill'
+  | 'bomb'
   | 'ice'
   | 'bounce'
   | 'knockback'

@@ -17,6 +17,9 @@ function resolveAppVersion() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    cpus: 1,
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: resolveAppVersion(),
   },

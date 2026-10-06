@@ -28,9 +28,153 @@ assert.equal(isLegalTrapPlacement('linearsaw', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('linearsaw', 2, 7, 90, []), true)
 assert.equal(isLegalTrapPlacement('hunterguard', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('hunterguard', 2, 10, 0, []), false)
+assert.equal(isLegalTrapPlacement('bouncepad', 1, 11, 0, []), true)
+assert.equal(isLegalTrapPlacement('bouncepad', 1, 10, 0, []), false)
+assert.equal(isLegalTrapPlacement('gustlauncher', 2, 11, 0, []), true)
 
-assert.ok(TRAP_DEFINITIONS.length >= 95)
+const bouncePadSimulation = new GameSimulation(
+  1,
+  [{ id: 'bounce-test', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'bounce-test-trap',
+    trapId: 'bouncepad',
+    ownerId: 'p1',
+    x: 1,
+    y: 11,
+    width: 2,
+    height: 1,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const bouncePadPlayer = bouncePadSimulation.players.get('bounce-test')
+assert.ok(bouncePadPlayer)
+bouncePadPlayer.x = 60
+bouncePadPlayer.y = 540
+bouncePadSimulation.tick(1 / 60)
+assert.ok(bouncePadPlayer.velocityY < -1000, 'bounce pad must launch above the normal jump impulse')
+
+const magnetSimulation = new GameSimulation(
+  1,
+  [{ id: 'magnet-test', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'magnet-test-trap',
+    trapId: 'magnetcore',
+    ownerId: 'p1',
+    x: 10,
+    y: 8,
+    width: 2,
+    height: 2,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const magnetPlayer = magnetSimulation.players.get('magnet-test')
+assert.ok(magnetPlayer)
+magnetPlayer.x = 420
+magnetPlayer.y = 440
+magnetPlayer.onGround = false
+magnetPlayer.velocityY = 0
+magnetSimulation.tick(1 / 60)
+assert.ok(magnetPlayer.velocityX > 0, 'magnet core must pull the player toward its center')
+
+const freezeBubbleSimulation = new GameSimulation(
+  1,
+  [{ id: 'freeze-test', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'freeze-test-trap',
+    trapId: 'freezebubble',
+    ownerId: 'p1',
+    x: 2,
+    y: 10,
+    width: 1,
+    height: 1,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const freezePlayer = freezeBubbleSimulation.players.get('freeze-test')
+assert.ok(freezePlayer)
+freezePlayer.x = 105
+freezePlayer.y = 500
+freezeBubbleSimulation.setInput('freeze-test', { left: false, right: true, jump: false }, 1)
+freezeBubbleSimulation.tick(1 / 60)
+assert.ok(freezePlayer.freezeUntil > 0, 'freeze bubble must arm on entry')
+freezeBubbleSimulation.tick(1 / 60)
+assert.equal(freezePlayer.velocityX, 0)
+
+const moonBubbleSimulation = new GameSimulation(
+  1,
+  [{ id: 'moon-test', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'moon-test-trap',
+    trapId: 'moonbubble',
+    ownerId: 'p1',
+    x: 2,
+    y: 10,
+    width: 1,
+    height: 2,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const moonPlayer = moonBubbleSimulation.players.get('moon-test')
+assert.ok(moonPlayer)
+moonPlayer.x = 105
+moonPlayer.y = 500
+moonBubbleSimulation.tick(1 / 60)
+assert.ok(moonPlayer.lowGravityUntil > 0, 'moon bubble must reduce gravity on entry')
+
+const gustSimulation = new GameSimulation(
+  1,
+  [{ id: 'gust-test', slot: 1, label: 'Player 1', score: 0 }],
+  [{
+    instanceId: 'gust-test-trap',
+    trapId: 'gustlauncher',
+    ownerId: 'p1',
+    x: 2,
+    y: 11,
+    width: 1,
+    height: 1,
+    rotation: 0,
+    placedRound: 1,
+  }],
+)
+const gustPlayer = gustSimulation.players.get('gust-test')
+assert.ok(gustPlayer)
+gustPlayer.x = 105
+gustPlayer.y = 500
+gustSimulation.tick(1 / 60)
+assert.ok(gustPlayer.velocityY < 0, 'gust launcher must push the player upward')
+
+assert.ok(TRAP_DEFINITIONS.length >= 100)
 assert.ok(TRAP_DEFINITIONS.some((definition) => definition.id === 'cannon'))
+for (const [trapId, effect] of [
+  ['bouncepad', 'bounce'],
+  ['magnetcore', 'magnet'],
+  ['freezebubble', 'freeze'],
+  ['moonbubble', 'low-gravity'],
+  ['gustlauncher', 'wind'],
+] as const) {
+  const definition = TRAP_DEFINITIONS.find((item) => item.id === trapId)
+  assert.ok(definition, `${trapId} must be present in the component table`)
+  assert.equal(definition.effect, effect)
+  assert.equal(definition.sourceType, 'custom')
+  assert.ok(definition.iconAsset?.endsWith('.png'))
+}
+for (const [trapId, width, height] of [['bombsmall', 1, 1] as const, ['bomb', 2, 2] as const]) {
+  const definitions = TRAP_DEFINITIONS.filter((definition) => definition.id === trapId)
+  assert.ok(definitions.length > 0, `${trapId} must be present in the extracted component table`)
+  for (const definition of definitions) {
+    assert.equal(definition.effect, 'bomb')
+    assert.equal(definition.collisionMode, 'none')
+    assert.equal(definition.width, width)
+    assert.equal(definition.height, height)
+    assert.equal(definition.snapToGround, false)
+    assert.equal(definition.rotateMode, 0)
+    assert.equal(definition.fullrect, true)
+  }
+}
 
 // Effect-only components have trigger volumes but no physical wall. Physical
 // league bodies use the authored sprite/platform dimensions instead of a full
@@ -1088,7 +1232,33 @@ for (const [trapId, width, height] of [['bombsmall', 1, 1] as const, ['bomb', 2,
   bombPlayer.x = 1000
   bombPlayer.y = 400
   bombSimulation.tick(1 / 60)
-  assert.equal(bombPlayer.alive, false, `${trapId} must kill on footprint contact`)
+  assert.equal(bombSimulation.snapshot('BUILDING').level.traps.length, 1, `${trapId} must remain during building`)
+  bombSimulation.armBombFuses()
+  bombSimulation.tick(1 / 60)
+  assert.equal(bombPlayer.alive, true, `${trapId} must not damage a player on contact`)
+  assert.equal(bombSimulation.snapshot('PLAYING').level.traps.length, 1, `${trapId} should remain during its fuse`)
+  for (let index = 0; index < 44; index += 1) bombSimulation.tick(1 / 60)
+  assert.equal(bombPlayer.alive, true, `${trapId} must never directly damage a player`)
+  assert.equal(bombSimulation.snapshot('PLAYING').level.traps.length, 0, `${trapId} should detonate after its fuse`)
 }
+
+// Bombs destroy placed components by authored cell overlap, including a
+// nested bomb chain, while leaving components outside the footprint intact.
+const bombAndTargets = new GameSimulation(
+  1,
+  [{ id: 'bomb-target-player', slot: 1, label: 'Player 1', score: 0 }],
+  [
+    { instanceId: 'large-bomb', trapId: 'bomb', ownerId: 'p1', x: 10, y: 8, width: 2, height: 2, rotation: 0, placedRound: 1 },
+    { instanceId: 'inside-spike', trapId: 'spike', ownerId: 'p1', x: 11, y: 9, width: 1, height: 1, rotation: 0, placedRound: 1 },
+    { instanceId: 'inside-small-bomb', trapId: 'bombsmall', ownerId: 'p1', x: 10, y: 8, width: 1, height: 1, rotation: 0, placedRound: 1 },
+    { instanceId: 'outside-spike', trapId: 'spike', ownerId: 'p1', x: 13, y: 8, width: 1, height: 1, rotation: 0, placedRound: 1 },
+  ],
+)
+bombAndTargets.armBombFuses()
+for (let index = 0; index < 45; index += 1) bombAndTargets.tick(1 / 60)
+assert.deepEqual(
+  bombAndTargets.snapshot('PLAYING').level.traps.map((trap) => trap.instanceId),
+  ['outside-spike'],
+)
 
 console.log('simulation tests passed')

@@ -127,6 +127,7 @@ export class PartyScene extends Phaser.Scene {
   private gridGraphics?: Phaser.GameObjects.Graphics
   private buildStartLabel?: Phaser.GameObjects.Text
   private trapSprites = new Map<string, Phaser.GameObjects.Container>()
+  private trapSnapshots = new Map<string, GameState['level']['traps'][number]>()
   private trapRenderSignatures = new Map<string, string>()
   private trapPhaseStartedAt = new Map<string, number>()
   private nextTrapAnimationProbeAt = 0
@@ -437,6 +438,7 @@ export class PartyScene extends Phaser.Scene {
       // interpolate the previous round's finish position into this round.
       this.localRenderPosition = null
       this.playerTargets.clear()
+      this.trapSnapshots.clear()
       this.lastStatus = null
     }
     this.currentState = state
@@ -445,6 +447,7 @@ export class PartyScene extends Phaser.Scene {
     this.currentCountdown = countdown
     if (!state || state.status !== 'PLAYING') this.localRenderPosition = null
     if (!state) {
+      this.trapSnapshots.clear()
       return
     }
     this.renderState()
@@ -1017,7 +1020,13 @@ export class PartyScene extends Phaser.Scene {
     }
 
     const texture = this.componentTexture(component)
-    if (texture) this.addTextureImage(container, texture, 0, 0)
+    if (texture) {
+      const image = this.addTextureImage(container, texture, 0, 0)
+      image?.setDisplaySize(
+        (component.viewWidth ?? component.width) * cell,
+        (component.viewHeight ?? component.height) * cell,
+      )
+    }
   }
 
   private drawPlacedTraps(state: GameState, build: BuildState | null) {
@@ -1025,10 +1034,15 @@ export class PartyScene extends Phaser.Scene {
     const activeIds = new Set(state.level.traps.map((trap) => trap.instanceId))
     for (const [id, sprite] of this.trapSprites) {
       if (activeIds.has(id)) continue
+      const removedTrap = this.trapSnapshots.get(id)
+      if (removedTrap?.trapId === 'bomb' || removedTrap?.trapId === 'bombsmall') {
+        this.playBombExplosion(state, removedTrap)
+      }
       sprite.destroy()
       this.trapSprites.delete(id)
       this.trapRenderSignatures.delete(id)
       this.trapPhaseStartedAt.delete(id)
+      this.trapSnapshots.delete(id)
     }
     for (const trap of state.level.traps) {
       const component = PDZZ_COMPONENTS.find((item) => item.id === trap.trapId)
@@ -1070,7 +1084,40 @@ export class PartyScene extends Phaser.Scene {
           : trap.trapId === 'triggerspikes' || trap.trapId === 'guillotineaxe'
             ? visualAnchor.angle
             : (trap.visualRotation ?? trap.rotation))
+      this.trapSnapshots.set(trap.instanceId, { ...trap })
     }
+  }
+
+  private playBombExplosion(
+    state: GameState,
+    trap: GameState['level']['traps'][number],
+  ) {
+    const frame = this.resolveAtlasFrame(
+      'pdzz-game',
+      trap.trapId === 'bombsmall' ? 'tinyexplode.png' : 'bigexplode.png',
+    )
+    if (!frame) return
+    const anchor = this.trapVisualAnchor(
+      trap.trapId,
+      trap.x,
+      trap.y,
+      trap.width,
+      trap.height,
+      state.level.cellSize,
+      trap.rotation,
+    )
+    const explosion = this.add.image(anchor.x, anchor.y, 'pdzz-game', frame)
+      .setOrigin(0.5, 0.5)
+      .setDepth(4)
+      .setScale(trap.trapId === 'bombsmall' ? 0.6 : 1)
+    this.tweens.add({
+      targets: explosion,
+      alpha: 0,
+      scale: (trap.trapId === 'bombsmall' ? 0.6 : 1) * 1.12,
+      duration: 360,
+      ease: 'Quad.Out',
+      onComplete: () => explosion.destroy(),
+    })
   }
 
   private drawBuildGrid(state: GameState, build: BuildState | null) {

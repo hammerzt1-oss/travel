@@ -1089,10 +1089,10 @@ export default function PartyGame() {
                   )
                 })}
               </div>
-              <section className="pdzz-component-guide" aria-label="原作机关说明">
+              <section className="pdzz-component-guide" aria-label="组件功能与配置说明">
                 <div className="pdzz-component-guide-heading">
-                  <strong>原作机关配置</strong>
-                  <span>滑动查看全部 15 个</span>
+                  <strong>组件功能与配置</strong>
+                  <span>滑动查看全部 20 个</span>
                 </div>
                 <div className="pdzz-component-guide-list">
                   {PDZZ_LEAGUE_COMPONENT_GUIDE.map((guide) => {
@@ -1113,7 +1113,7 @@ export default function PartyGame() {
               </section>
             <div className="build-note">
               <strong>格子规则</strong>
-                <span>绿色格都是当前机关的合法位置；所有机关必须整格对齐，不能和地面或已有机关重叠。只有普通地刺需要贴地，其余机关可悬空放置。</span>
+                <span>绿色格都是当前机关的合法位置；所有机关必须整格对齐，不能和地面或已有机关重叠。地刺、猎杀兵、星跃弹射板和风暴喷口需要贴在平台顶面，其余机关按各自配置放置。</span>
               </div>
               {pendingPlacement && pendingPlacement.playerId === localPlayerId && (
                 <div className="placement-controls">
