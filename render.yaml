@@ -5,8 +5,9 @@ services:
     plan: free
     branch: main
     autoDeploy: true
-    buildCommand: npm --prefix backend install --include=dev && npm --prefix backend run build
-    startCommand: npm --prefix backend run start
+    # Compile once during the deploy; do not compile again during process start.
+    buildCommand: npm --prefix backend ci --include=dev && npm --prefix backend run build
+    startCommand: node backend/dist/backend/server.js
     healthCheckPath: /health
     buildFilter:
       paths:
