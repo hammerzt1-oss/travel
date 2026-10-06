@@ -207,8 +207,8 @@ assert.deepEqual(
     spawnY: 1240,
     finishX: 1821,
     finishY: 1300,
-    finishWidth: 53,
-    finishHeight: 106,
+    finishWidth: 75,
+    finishHeight: 100,
   },
 )
 assert.deepEqual(
@@ -558,20 +558,63 @@ for (let index = 0; index < 20; index += 1) jumpEdgeSimulation.tick(1 / 60)
 assert.equal(jumpEdgePlayer.onGround, true)
 assert.equal(jumpEdgePlayer.velocityY, 0)
 
+// A jump edge received during ordinary flight is discarded. It must not be
+// buffered into a second jump when the player lands.
+const airborneJumpSimulation = new GameSimulation(
+  1,
+  [{ id: 'airborne-jump', slot: 1, label: '棒尼', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const airborneJumpPlayer = airborneJumpSimulation.players.get('airborne-jump')
+assert.ok(airborneJumpPlayer)
+airborneJumpPlayer.x = 328
+airborneJumpPlayer.y = 900
+airborneJumpPlayer.onGround = false
+airborneJumpPlayer.velocityY = 250
+airborneJumpSimulation.setInput('airborne-jump', { left: false, right: false, jump: true }, 1, true)
+airborneJumpSimulation.tick(0.017)
+assert.equal(airborneJumpPlayer.jumpConsumed, false)
+for (let sequence = 2; sequence <= 30; sequence += 1) {
+  airborneJumpSimulation.setInput('airborne-jump', { left: false, right: false, jump: true }, sequence, false)
+  airborneJumpSimulation.tick(0.017)
+}
+airborneJumpSimulation.setInput('airborne-jump', { left: false, right: false, jump: false }, 31, false)
+for (let index = 0; index < 100; index += 1) airborneJumpSimulation.tick(0.017)
+assert.equal(airborneJumpPlayer.onGround, true)
+assert.equal(airborneJumpPlayer.velocityY, 0)
+
+// A duplicate press packet while the button is still held is not another
+// edge, even if it carries a newer transport sequence.
+const duplicateJumpSimulation = new GameSimulation(
+  1,
+  [{ id: 'duplicate-jump', slot: 1, label: '棒尼', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const duplicateJumpPlayer = duplicateJumpSimulation.players.get('duplicate-jump')
+assert.ok(duplicateJumpPlayer)
+duplicateJumpSimulation.setInput('duplicate-jump', { left: false, right: false, jump: true }, 1, true)
+duplicateJumpSimulation.tick(0.017)
+const firstJumpVelocity = duplicateJumpPlayer.velocityY
+duplicateJumpSimulation.setInput('duplicate-jump', { left: false, right: false, jump: true }, 2, true)
+duplicateJumpSimulation.tick(0.017)
+assert.ok(duplicateJumpPlayer.velocityY > firstJumpVelocity, 'duplicate press must not reset the jump impulse')
+
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].y, 1240)
-// The goal uses the actual 53x106 flag frame footprint. Merely being near the
-// finish platform, or standing to the left of the flag, must not complete the
-// round.
+// The goal uses the APK GoalArea trigger (1.5x2 cells), not the 53x106 flag
+// image frame. Merely being near the finish platform must not complete the
+// round; the player must overlap the authored trigger.
 haystackPlayer.x = 1740
 haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, false)
-haystackPlayer.x = 1780
+haystackPlayer.x = 1750
 haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, false)
-haystackPlayer.x = 1800
+haystackPlayer.x = 1780
 haystackPlayer.y = 1200
 haystackSimulation.tick(0.017)
 assert.equal(haystackSimulation.snapshot('PLAYING').players[0].finished, true)

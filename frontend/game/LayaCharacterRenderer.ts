@@ -66,6 +66,7 @@ type PlayerTrack = {
     onWall: boolean
     wallDirection: -1 | 1
     fallingTime: number
+    jumpBufferUntil: number
     extraHorizontalAirSpeed: number
     springContactId: string | null
     reverseControls: boolean
@@ -303,10 +304,13 @@ export class LayaCharacterRenderer {
     if (this.disposed) return
     const now = performance.now()
     this.advanceLocalPrediction(now)
+    const wasJumpHeld = this.localInput.jump
     this.localPlayerId = playerId
     this.localInput = { ...input }
     if (sequence !== undefined) this.localInputSequence = Math.max(this.localInputSequence, sequence)
-    if (!playerId || !jumpPressed) return
+    // Pointer/key repeat packets can arrive more than once for one physical
+    // press. Only the false -> true edge may start a local jump prediction.
+    if (!playerId || !jumpPressed || wasJumpHeld) return
     const player = this.latestPlayers.get(playerId)
     const track = this.tracks.get(playerId)
     if (track && !track.localPrediction) {
@@ -336,7 +340,7 @@ export class LayaCharacterRenderer {
       prediction.jumpStartedAt = now
       prediction.serverAirborne = false
       prediction.updatedAt = now
-    } else if (prediction.grounded || player.animationState === 'idle' || player.animationState === 'run') {
+    } else if (prediction.grounded) {
       const inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.normalJumpStartVelocity
       prediction.jumping = true
@@ -348,6 +352,10 @@ export class LayaCharacterRenderer {
       prediction.extraHorizontalAirSpeed = 0
       prediction.velocityX = inputVelocityX
       prediction.updatedAt = now
+    } else if (prediction.onWall && prediction.velocityY >= 0) {
+      // Match the server's narrow pre-cling wall-jump buffer. Ordinary
+      // airborne presses are intentionally ignored and never buffered.
+      prediction.jumpBufferUntil = now + 200
     }
   }
 
@@ -521,6 +529,7 @@ export class LayaCharacterRenderer {
       onWall: false,
       wallDirection: 1 as const,
       fallingTime: 0,
+      jumpBufferUntil: 0,
       extraHorizontalAirSpeed: 0,
       springContactId: null as string | null,
       reverseControls: Boolean(player.reverseControls),
@@ -557,6 +566,19 @@ export class LayaCharacterRenderer {
     const wallClinging = !wasGrounded && prediction.onWall && prediction.fallingTime > 0.085 && prediction.velocityY >= 0
     if (wallClinging && prediction.extraHorizontalAirSpeed * prediction.wallDirection < 0) {
       prediction.extraHorizontalAirSpeed = 0
+    }
+    if (prediction.jumpBufferUntil > now && wallClinging) {
+      const inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
+      prediction.velocityY = PDZZ_PHYSICS.playerDerived.wallJumpStartVerticalVelocity
+      prediction.extraHorizontalAirSpeed = prediction.wallDirection * PDZZ_PHYSICS.playerDerived.wallJumpStartHorizontalVelocity
+      prediction.velocityX = inputVelocityX + prediction.extraHorizontalAirSpeed
+      prediction.onWall = false
+      prediction.fallingTime = 0
+      prediction.jumping = true
+      prediction.grounded = false
+      prediction.jumpBufferUntil = 0
+      prediction.jumpStartedAt = now
+      prediction.serverAirborne = false
     }
     const rawHorizontal = (this.localInput.right ? 1 : 0) - (this.localInput.left ? 1 : 0)
     const horizontal = prediction.reverseControls ? -rawHorizontal : rawHorizontal
@@ -697,6 +719,7 @@ export class LayaCharacterRenderer {
       }
       prediction.onWall = false
       prediction.fallingTime = 0
+      prediction.jumpBufferUntil = 0
     } else if (hitCeiling) {
       prediction.grounded = false
       prediction.jumping = true

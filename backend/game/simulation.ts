@@ -50,6 +50,8 @@ type SimPlayer = {
   input: PlayerInput
   /** A queued jump edge. It is consumed once by the next physics tick. */
   jumpPressed: boolean
+  /** Prevent repeated touch/keyboard packets from becoming extra jump edges. */
+  jumpHeld: boolean
   pendingInputSequence: number
   lastProcessedInputSequence: number
   jumpConsumed: boolean
@@ -423,13 +425,13 @@ function buildMapLevel(mapId: string): LevelSnapshot {
     spawnY: spawn.y - PLAYER_HEIGHT,
     finishX: finish.x,
     finishY: finish.y,
-    // The extracted haystack flag is a 53x106 atlas frame. Its authored
-    // runtime position is the bottom-left visual anchor used by PartyScene,
-    // so the authoritative hitbox must use that same footprint rather than a
-    // larger editor cell area that can award a win beside the flag.
+    // The APK GoalArea trigger is 1.5 cells wide by 2 cells high. The flag
+    // image is only 53x106, but that visual frame is not the physics shape.
+    // Keep the authored trigger dimensions here and apply its local offset in
+    // tickPlayer(), matching GoalArea.createFlag() in main.min.js.
     finishRadius: 0,
-    finishWidth: 53,
-    finishHeight: 106,
+    finishWidth: CELL_SIZE * 1.5,
+    finishHeight: CELL_SIZE * 2,
   }
 }
 
@@ -1236,6 +1238,7 @@ export class GameSimulation {
             ready: true,
             input: { left: false, right: false, jump: false },
             jumpPressed: false,
+            jumpHeld: false,
             pendingInputSequence: 0,
             lastProcessedInputSequence: 0,
             jumpConsumed: false,
@@ -1303,11 +1306,17 @@ export class GameSimulation {
         ? Math.max(0, Math.floor(sequence))
         : player.pendingInputSequence
     if (nextSequence <= player.pendingInputSequence) return
+    const wasJumpHeld = player.jumpHeld
     player.input = cloneInput(input)
     player.pendingInputSequence = nextSequence
-    // Keep a press edge queued even when the following 33ms heartbeat has
-    // already released the button before the next physics tick.
-    if (jumpPressed) player.jumpPressed = true
+    if (!player.input.jump) player.jumpHeld = false
+    // Keep one press edge even when the following 33ms heartbeat has already
+    // released the button before the next physics tick. A held touch/key or
+    // duplicate packet must not create another edge while airborne.
+    if (jumpPressed && !wasJumpHeld) {
+      player.jumpPressed = true
+      player.jumpHeld = true
+    }
   }
 
   tick(dt: number) {
@@ -1529,18 +1538,19 @@ export class GameSimulation {
     }
 
     if (player.jumpPressed) {
-      player.jumpBufferUntil = this.elapsed + 0.2
-      player.jumpConsumed = false
       player.jumpPressed = false
-    }
-    if (player.jumpBufferUntil > this.elapsed && !player.jumpConsumed) {
+      player.jumpBufferUntil = 0
+      player.jumpConsumed = false
+      // The league controller has no double jump. A press is consumed only
+      // on the current grounded frame or after the wall-cling threshold;
+      // pressing during ordinary flight is deliberately discarded instead of
+      // being buffered into an automatic second jump on landing.
       if (player.onGround) {
         player.springJump = false
         player.velocityY = player.surfaceMaterial === 'mud'
           ? PHYSICS.playerDerived.mudJumpStartVelocity
           : PHYSICS.playerDerived.normalJumpStartVelocity
         player.onGround = false
-        player.jumpBufferUntil = 0
         player.jumpConsumed = true
       } else if (wallClinging) {
         player.springJump = false
@@ -1548,9 +1558,22 @@ export class GameSimulation {
         player.velocityY = PHYSICS.playerDerived.wallJumpStartVerticalVelocity * wallJumpVariation
         player.extraHorizontalAirSpeed = player.wallDirection * PHYSICS.playerDerived.wallJumpStartHorizontalVelocity * wallJumpVariation
         player.direction = player.wallDirection
-        player.jumpBufferUntil = 0
         player.jumpConsumed = true
+      } else if (player.onWall && player.velocityY >= 0) {
+        // The source controller can receive the press a few fixed slices
+        // before wall cling becomes armed. Preserve that narrow wall-jump
+        // buffer, but never buffer an ordinary airborne press into landing.
+        player.jumpBufferUntil = this.elapsed + 0.2
       }
+    }
+    if (player.jumpBufferUntil > this.elapsed && !player.jumpConsumed && wallClinging) {
+      player.springJump = false
+      const wallJumpVariation = player.inMud ? 0.65 : 1
+      player.velocityY = PHYSICS.playerDerived.wallJumpStartVerticalVelocity * wallJumpVariation
+      player.extraHorizontalAirSpeed = player.wallDirection * PHYSICS.playerDerived.wallJumpStartHorizontalVelocity * wallJumpVariation
+      player.direction = player.wallDirection
+      player.jumpBufferUntil = 0
+      player.jumpConsumed = true
     }
 
     // The original calculates jump/fall gravity before applying velocity. A
@@ -1869,9 +1892,10 @@ export class GameSimulation {
       const finishWidth = this.level.finishWidth ?? CELL_SIZE * 1.5
       const finishHeight = this.level.finishHeight ?? CELL_SIZE * 2
       const finishTrigger = {
-        // finishX/finishY are the flag frame's Phaser anchor (0.05, 1), so
-        // move the authoritative frame rectangle by the same origin offset.
-        x: this.level.finishX - finishWidth * 0.05,
+        // GoalArea.createFlag() creates BoxCollider(1.5 cells, 2 cells)
+        // with localOffset(-0.75 cells, -2 cells). finishX/finishY are the
+        // authored goal entity point, not the visual frame bounds.
+        x: this.level.finishX - CELL_SIZE * 0.75,
         y: this.level.finishY - finishHeight,
         width: finishWidth,
         height: finishHeight,
