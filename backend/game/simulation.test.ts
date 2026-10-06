@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   GameSimulation,
+  finishTriggerForLevel,
   levelForMap,
   isLegalTrapPlacement,
   TRAP_DEFINITIONS,
@@ -30,6 +31,9 @@ assert.equal(isLegalTrapPlacement('hunterguard', 2, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('hunterguard', 2, 10, 0, []), false)
 assert.equal(isLegalTrapPlacement('bouncepad', 1, 11, 0, []), true)
 assert.equal(isLegalTrapPlacement('bouncepad', 1, 10, 0, []), false)
+assert.equal(isLegalTrapPlacement('magnetcore', 5, 5, 0, []), true)
+assert.equal(isLegalTrapPlacement('freezebubble', 1, 1, 0, []), true)
+assert.equal(isLegalTrapPlacement('moonbubble', 2, 2, 0, []), true)
 assert.equal(isLegalTrapPlacement('gustlauncher', 2, 11, 0, []), true)
 
 const bouncePadSimulation = new GameSimulation(
@@ -1188,6 +1192,26 @@ flashBlindSimulation.tick(1 / 60)
 assert.equal(flashBlindSimulation.snapshot('PLAYING').players[0].blinded, true)
 for (let index = 0; index < 125; index += 1) flashBlindSimulation.tick(1 / 60)
 assert.equal(flashBlindSimulation.snapshot('PLAYING').players[0].blinded, false)
+
+const finishLevel = levelForMap('levelhaystack2')
+const finishTrigger = finishTriggerForLevel(finishLevel)
+assert.equal(finishTrigger.width, 75)
+assert.equal(finishTrigger.height, 100)
+const finishSimulation = new GameSimulation(
+  1,
+  [{ id: 'finish-player', slot: 1, label: 'Player 1', score: 0 }],
+  [],
+  'levelhaystack2',
+)
+const finishPlayer = finishSimulation.players.get('finish-player')
+assert.ok(finishPlayer)
+// Contact at the left edge of the authored GoalArea trigger counts as a win.
+finishPlayer.x = finishTrigger.x
+finishPlayer.y = finishLevel.finishY - 60
+finishPlayer.onGround = true
+finishSimulation.tick(1 / 60)
+assert.equal(finishPlayer.finished, true)
+assert.equal(finishSimulation.isComplete(), true)
 
 const guillotineAtStart = new GameSimulation(
   1,

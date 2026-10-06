@@ -137,6 +137,10 @@ export type PlayerSnapshot = {
   reverseControls?: boolean
   /** The gravity-flip trigger currently pulls the player upward. */
   gravityFlipped?: boolean
+  /** The freeze bubble currently blocks horizontal input and jump. */
+  frozen?: boolean
+  /** The moon bubble currently reduces gravity. */
+  lowGravity?: boolean
   /** Highest client input sequence already consumed by the authoritative tick. */
   lastProcessedInputSequence: number
   bot?: boolean

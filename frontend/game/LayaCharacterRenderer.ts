@@ -71,6 +71,8 @@ type PlayerTrack = {
     springContactId: string | null
     reverseControls: boolean
     gravityFlipped: boolean
+    frozen: boolean
+    lowGravity: boolean
     updatedAt: number
     correctionX: number
     correctionY: number
@@ -322,6 +324,13 @@ export class LayaCharacterRenderer {
     // The input edge must not wait for the next authoritative animation
     // packet. On mobile that packet can still say "fall" for one frame after
     // the feet have landed, which used to swallow a perfectly valid jump.
+    if (prediction.frozen) {
+      prediction.velocityX = 0
+      prediction.extraHorizontalAirSpeed = 0
+      prediction.jumpBufferUntil = 0
+      prediction.updatedAt = now
+      return
+    }
     const wallClinging = !prediction.grounded && prediction.onWall && prediction.fallingTime > 0.085 && prediction.velocityY >= 0
     if (wallClinging) {
       // Keep the APK's currentInputHoriSpeed component when replacing the
@@ -431,6 +440,8 @@ export class LayaCharacterRenderer {
       // immediately instead of waiting for a position correction.
       prediction.reverseControls = Boolean(player.reverseControls)
       prediction.gravityFlipped = Boolean(player.gravityFlipped)
+      prediction.frozen = Boolean(player.frozen)
+      prediction.lowGravity = Boolean(player.lowGravity)
       this.advanceLocalPrediction(receivedAt)
       const acknowledgedSequence = Number.isFinite(player.lastProcessedInputSequence)
         ? Math.max(0, Math.floor(player.lastProcessedInputSequence))
@@ -534,6 +545,8 @@ export class LayaCharacterRenderer {
       springContactId: null as string | null,
       reverseControls: Boolean(player.reverseControls),
       gravityFlipped: Boolean(player.gravityFlipped),
+      frozen: Boolean(player.frozen),
+      lowGravity: Boolean(player.lowGravity),
       updatedAt: receivedAt,
       correctionX: 0,
       correctionY: 0,
@@ -567,7 +580,7 @@ export class LayaCharacterRenderer {
     if (wallClinging && prediction.extraHorizontalAirSpeed * prediction.wallDirection < 0) {
       prediction.extraHorizontalAirSpeed = 0
     }
-    if (prediction.jumpBufferUntil > now && wallClinging) {
+    if (!prediction.frozen && prediction.jumpBufferUntil > now && wallClinging) {
       const inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
       prediction.velocityY = PDZZ_PHYSICS.playerDerived.wallJumpStartVerticalVelocity
       prediction.extraHorizontalAirSpeed = prediction.wallDirection * PDZZ_PHYSICS.playerDerived.wallJumpStartHorizontalVelocity
@@ -584,7 +597,10 @@ export class LayaCharacterRenderer {
     const horizontal = prediction.reverseControls ? -rawHorizontal : rawHorizontal
     const acceleration = PDZZ_PHYSICS.player.horizontalInputAcceleration * dt
     let inputVelocityX = prediction.velocityX - prediction.extraHorizontalAirSpeed
-    if (horizontal !== 0) {
+    if (prediction.frozen) {
+      inputVelocityX = 0
+      prediction.extraHorizontalAirSpeed = 0
+    } else if (horizontal !== 0) {
       inputVelocityX = this.approach(
         inputVelocityX,
         horizontal * PDZZ_PHYSICS.player.normalHorizontalSpeed,
@@ -600,11 +616,13 @@ export class LayaCharacterRenderer {
     if (prediction.jumping || !wasGrounded) {
       const gravity = prediction.gravityFlipped
         ? -PDZZ_PHYSICS.playerDerived.gravity
-        : wallClinging
-        ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.wallGravityVariation
-        : prediction.fallingTime > 0
-          ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.fallGravityVariation
-          : PDZZ_PHYSICS.playerDerived.gravity * (this.localInput.jump ? 1 : PDZZ_PHYSICS.player.jumpUpGravityVariation)
+        : prediction.lowGravity
+          ? PDZZ_PHYSICS.playerDerived.gravity * 0.22
+          : wallClinging
+            ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.wallGravityVariation
+            : prediction.fallingTime > 0
+              ? PDZZ_PHYSICS.playerDerived.gravity * PDZZ_PHYSICS.player.fallGravityVariation
+              : PDZZ_PHYSICS.playerDerived.gravity * (this.localInput.jump ? 1 : PDZZ_PHYSICS.player.jumpUpGravityVariation)
       prediction.velocityY = Math.min(
         wallClinging ? PDZZ_PHYSICS.player.maxWallSlideSpeed : PDZZ_PHYSICS.player.maxFallSpeed,
         prediction.velocityY + gravity * dt,

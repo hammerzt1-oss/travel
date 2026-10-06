@@ -55,6 +55,8 @@ type SimPlayer = {
   pendingInputSequence: number
   lastProcessedInputSequence: number
   jumpConsumed: boolean
+  /** League controller allows one jump per airborne spell until landing. */
+  jumpsRemaining: number
   jumpBufferUntil: number
   /** APK's fallingTime: accumulated descending air time, not wall contact time. */
   fallingTime: number
@@ -206,6 +208,19 @@ function overlaps(
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by
 }
 
+function overlapsIncludingEdges(
+  ax: number,
+  ay: number,
+  aw: number,
+  ah: number,
+  bx: number,
+  by: number,
+  bw: number,
+  bh: number,
+) {
+  return ax <= bx + bw && ax + aw >= bx && ay <= by + bh && ay + ah >= by
+}
+
 type CollisionRect = { x: number; y: number; width: number; height: number }
 
 /**
@@ -247,6 +262,38 @@ function sweptPlayerOverlapsRect(
   }
 
   return clipAxis(previousX, deltaX, minX, maxX) && clipAxis(previousY, deltaY, minY, maxY)
+}
+
+/** APK GoalArea.createFlag(): 1.5×2 cells with localOffset(-0.75, -2). */
+export function finishTriggerForLevel(level: LevelSnapshot) {
+  const finishWidth = level.finishWidth ?? CELL_SIZE * 1.5
+  const finishHeight = level.finishHeight ?? CELL_SIZE * 2
+  return {
+    x: level.finishX - CELL_SIZE * 0.75,
+    y: level.finishY - finishHeight,
+    width: finishWidth,
+    height: finishHeight,
+  }
+}
+
+function playerOverlapsFinishTrigger(
+  previousX: number,
+  previousY: number,
+  x: number,
+  y: number,
+  finishTrigger: CollisionRect,
+) {
+  if (sweptPlayerOverlapsRect(previousX, previousY, x, y, finishTrigger)) return true
+  return overlapsIncludingEdges(
+    x,
+    y,
+    PLAYER_WIDTH,
+    PLAYER_HEIGHT,
+    finishTrigger.x,
+    finishTrigger.y,
+    finishTrigger.width,
+    finishTrigger.height,
+  )
 }
 
 function sweptPlayerOverlapsCircle(
@@ -900,6 +947,7 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number, level: LevelSnapsho
         }
       case 'ice':
       case 'ice3x1':
+      case 'soapslide':
         switch (trap.rotation) {
           case 90: return { ...cell, x: x + 35, y, width: 15, height: 50 }
           case 180: return { ...cell, x, y, width: 50, height: 15 }
@@ -907,6 +955,7 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number, level: LevelSnapsho
           default: return { ...cell, x, y: y + 35, width: 50, height: 15 }
         }
       case 'mud':
+      case 'honeyjar':
         switch (trap.rotation) {
           case 90: return { ...cell, x: x + 35, y: y + 5, width: 15, height: 40 }
           case 180: return { ...cell, x: x + 5, y, width: 40, height: 15 }
@@ -916,6 +965,7 @@ function trapTriggerRects(trap: PlacedTrap, elapsed: number, level: LevelSnapsho
       case 'spikeball':
         return { ...cell, x: x + 7.5, y: y + 7.5, width: 35, height: 35 }
       case 'gas':
+      case 'scarebell':
         return { ...cell, x: x - 0.5 * CELL_SIZE, y: y - 0.5 * CELL_SIZE, width: 2 * CELL_SIZE, height: 2 * CELL_SIZE }
       case 'linearsaw':
         return { ...cell }
@@ -1242,6 +1292,7 @@ export class GameSimulation {
             pendingInputSequence: 0,
             lastProcessedInputSequence: 0,
             jumpConsumed: false,
+            jumpsRemaining: 1,
             jumpBufferUntil: 0,
             fallingTime: 0,
             supportId: null,
@@ -1545,12 +1596,13 @@ export class GameSimulation {
       // on the current grounded frame or after the wall-cling threshold;
       // pressing during ordinary flight is deliberately discarded instead of
       // being buffered into an automatic second jump on landing.
-      if (player.onGround) {
+      if (player.onGround && player.jumpsRemaining > 0) {
         player.springJump = false
         player.velocityY = player.surfaceMaterial === 'mud'
           ? PHYSICS.playerDerived.mudJumpStartVelocity
           : PHYSICS.playerDerived.normalJumpStartVelocity
         player.onGround = false
+        player.jumpsRemaining = 0
         player.jumpConsumed = true
       } else if (wallClinging) {
         player.springJump = false
@@ -1558,6 +1610,7 @@ export class GameSimulation {
         player.velocityY = PHYSICS.playerDerived.wallJumpStartVerticalVelocity * wallJumpVariation
         player.extraHorizontalAirSpeed = player.wallDirection * PHYSICS.playerDerived.wallJumpStartHorizontalVelocity * wallJumpVariation
         player.direction = player.wallDirection
+        player.jumpsRemaining = 0
         player.jumpConsumed = true
       } else if (player.onWall && player.velocityY >= 0) {
         // The source controller can receive the press a few fixed slices
@@ -1676,6 +1729,7 @@ export class GameSimulation {
     if (movement.grounded) {
       player.velocityY = 0
       player.fallingTime = 0
+      player.jumpsRemaining = 1
       const landingPlatform = movement.surface as Surface | null
       player.supportId = landingPlatform?.trap?.instanceId ?? landingPlatform?.id ?? null
       player.springJump = false
@@ -1846,8 +1900,8 @@ export class GameSimulation {
     }
 
     // Magnet cores apply a continuous radial force, rather than a one-frame
-    // trigger. This is intentionally resolved after character movement so the
-    // next fixed tick immediately reflects the changed velocity.
+    // trigger. Resolve it after movement so the next fixed tick immediately
+    // reflects the changed velocity.
     for (const trap of this.placedTraps) {
       if (trap.trapId !== 'magnetcore' || this.isTrapDisabled(trap)) continue
       const center = trapEntityCenter(trap, this.elapsed, this.level)
@@ -1872,46 +1926,24 @@ export class GameSimulation {
       )
     }
 
-    // CharacterController.getIsOutOfBounds checks the entity foot position
-    // against viewBounds.bottom + 50. player.y is the collider top edge.
-    const footX = player.x + PLAYER_WIDTH / 2
-    const footY = player.y + PLAYER_HEIGHT
-    if (
-      footY > viewBounds.minY + viewBounds.height + 50 ||
-      footX < viewBounds.minX - 50 ||
-      footX > viewBounds.minX + viewBounds.width + 50
-    ) {
-      this.kill(player, null, false, null, 'out_of_bounds')
-      return
-    }
-
     // GoalArea owns a player trigger in the APK. The trigger is only allowed
     // to settle a player on enter, and levels marked noFlag do not create the
-    // initial goal area at all.
+    // initial goal area at all. A finished player leaves the physics loop
+    // immediately, so this check is deliberately idempotent and does not rely
+    // on a stale enter/exit occupant set.
     if (!this.level.noFlag) {
-      const finishWidth = this.level.finishWidth ?? CELL_SIZE * 1.5
-      const finishHeight = this.level.finishHeight ?? CELL_SIZE * 2
-      const finishTrigger = {
-        // GoalArea.createFlag() creates BoxCollider(1.5 cells, 2 cells)
-        // with localOffset(-0.75 cells, -2 cells). finishX/finishY are the
-        // authored goal entity point, not the visual frame bounds.
-        x: this.level.finishX - CELL_SIZE * 0.75,
-        y: this.level.finishY - finishHeight,
-        width: finishWidth,
-        height: finishHeight,
-      }
-      const insideFinish = sweptPlayerOverlapsRect(
+      const finishTrigger = finishTriggerForLevel(this.level)
+      const insideFinish = playerOverlapsFinishTrigger(
         previousX,
         previousY,
         player.x,
         player.y,
         finishTrigger,
       )
-      const wasInsideFinish = this.finishTriggerOccupants.has(player.id)
       if (insideFinish) this.finishTriggerOccupants.add(player.id)
       else this.finishTriggerOccupants.delete(player.id)
 
-      if (insideFinish && !wasInsideFinish) {
+      if (insideFinish) {
         // League single-player's canReachFlag has no star requirement. Keep
         // this explicit so a future mode can add the same gate at this point.
         const canReachFlag = true
@@ -1922,6 +1954,21 @@ export class GameSimulation {
           player.velocityY = 0
         }
       }
+    }
+
+    // CharacterController.getIsOutOfBounds checks the entity foot position
+    // against viewBounds.bottom + 50. player.y is the collider top edge. The
+    // goal check intentionally runs first so touching a flag at a level edge
+    // is a win rather than an out-of-bounds death.
+    const footX = player.x + PLAYER_WIDTH / 2
+    const footY = player.y + PLAYER_HEIGHT
+    if (
+      footY > viewBounds.minY + viewBounds.height + 50 ||
+      footX < viewBounds.minX - 50 ||
+      footX > viewBounds.minX + viewBounds.width + 50
+    ) {
+      this.kill(player, null, false, null, 'out_of_bounds')
+      return
     }
   }
 
@@ -2223,7 +2270,6 @@ export class GameSimulation {
         player.trapCooldowns.set(trap.instanceId, player.freezeUntil)
         return
       case 'magnet':
-        // The magnetic pull is continuous and resolved after movement below.
         return
       case 'low-gravity':
         player.lowGravityUntil = Math.max(
@@ -2350,11 +2396,11 @@ export class GameSimulation {
               ? 2.1
               : trap.trapId === 'gravityflip'
                 ? GRAVITY_FLIP_DURATION
-              : trap.trapId === 'flashblind'
-                ? FLASH_BLIND_DURATION
-                : trap.trapId === 'freezebubble'
-                  ? CREATIVE_COMPONENTS.freezeBubble.durationSeconds
-                  : CREATIVE_COMPONENTS.moonBubble.durationSeconds
+                : trap.trapId === 'flashblind'
+                  ? FLASH_BLIND_DURATION
+                  : trap.trapId === 'freezebubble'
+                    ? CREATIVE_COMPONENTS.freezeBubble.durationSeconds
+                    : CREATIVE_COMPONENTS.moonBubble.durationSeconds
         if (this.elapsed - started >= lifetime) this.trapActivationAt.delete(trap.instanceId)
       }
       const cells = trapCellRects(trap, this.elapsed, this.level)
@@ -2452,13 +2498,13 @@ export class GameSimulation {
               player.onGround = false
               player.supportId = null
               player.velocityY = Math.min(player.velocityY, -180)
-            } else if (trap.trapId === 'flashblind') {
-              player.blindUntil = Math.max(player.blindUntil, this.elapsed + FLASH_BLIND_DURATION)
-            } else if (trap.trapId === 'freezebubble') {
-              this.applyTrapEffect(player, trap, 'freeze')
-            } else if (trap.trapId === 'moonbubble') {
-              this.applyTrapEffect(player, trap, 'low-gravity')
-            }
+              } else if (trap.trapId === 'flashblind') {
+                player.blindUntil = Math.max(player.blindUntil, this.elapsed + FLASH_BLIND_DURATION)
+              } else if (trap.trapId === 'freezebubble') {
+                this.applyTrapEffect(player, trap, 'freeze')
+              } else if (trap.trapId === 'moonbubble') {
+                this.applyTrapEffect(player, trap, 'low-gravity')
+              }
           }
           this.trapTriggerOccupants.add(key)
         } else {
@@ -2476,12 +2522,12 @@ export class GameSimulation {
       if (!player.alive || player.finished) continue
       const body = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }
       const nextIce = this.placedTraps.some((trap) =>
-        trap.trapId === 'ice' && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
+        (trap.trapId === 'ice' || trap.trapId === 'ice3x1' || trap.trapId === 'soapslide') && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         ),
       )
       const nextMud = this.placedTraps.some((trap) =>
-        trap.trapId === 'mud' && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
+        (trap.trapId === 'mud' || trap.trapId === 'honeyjar') && trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
           overlaps(body.x, body.y, body.width, body.height, rect.x, rect.y, rect.width, rect.height),
         ),
       )
@@ -2494,10 +2540,13 @@ export class GameSimulation {
     }
   }
 
-  private hasGroundedSurfaceContact(player: SimPlayer, trapId: 'ice' | 'mud') {
+  private hasGroundedSurfaceContact(player: SimPlayer, kind: 'ice' | 'mud') {
     return this.placedTraps.some((trap) => {
       // pv/_v only report grounded material when the component faces up.
-      if (trap.trapId !== trapId || trap.rotation !== 0) return false
+      const matches = kind === 'ice'
+        ? trap.trapId === 'ice' || trap.trapId === 'ice3x1' || trap.trapId === 'soapslide'
+        : trap.trapId === 'mud' || trap.trapId === 'honeyjar'
+      if (!matches || trap.rotation !== 0) return false
       return trapTriggerRects(trap, this.elapsed, this.level).some((rect) =>
         overlaps(
           player.x + 4,
@@ -2521,7 +2570,7 @@ export class GameSimulation {
     }
 
     for (const trap of this.placedTraps) {
-      if (trap.trapId !== 'gas') continue
+      if (trap.trapId !== 'gas' && trap.trapId !== 'scarebell') continue
       const motion = trapMotion(trap, this.elapsed, this.level)
       // zy creates child colliders from the component origin. The extracted
       // APK uses local offsets (-1,-1) for the 2x2 outer box and
@@ -2789,6 +2838,8 @@ export class GameSimulation {
       blinded: player.blindUntil > this.elapsed,
       reverseControls: player.reverseUntil > this.elapsed,
       gravityFlipped: player.gravityFlipUntil > this.elapsed,
+      frozen: player.freezeUntil > this.elapsed,
+      lowGravity: player.lowGravityUntil > this.elapsed,
       lastProcessedInputSequence: player.lastProcessedInputSequence,
       bot: player.bot,
     }
